@@ -49,6 +49,12 @@ def ensure_database_ready(
     if active_settings.auto_bootstrap_demo:
         _prepare_demo_storage(active_settings)
     if inspect(app_engine).has_table("users"):
+        if active_settings.auto_bootstrap_demo:
+            from scripts.seed_demo import seed_demo
+
+            with _bootstrap_lock:
+                with session_factory() as session:
+                    seed_demo(session)
         return True
     if not active_settings.auto_bootstrap_demo:
         return False

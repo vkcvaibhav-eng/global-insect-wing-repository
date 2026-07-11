@@ -104,8 +104,9 @@ def _ensure_user(
     *,
     role: Role,
     password: str,
+    reset_password: bool = False,
 ) -> tuple[User, str]:
-    """Create one account, preserving an existing account's password hash."""
+    """Create one account, optionally resetting a demo account password."""
 
     email, full_name = ACCOUNT_DEFINITIONS[role]
     normalized_email = normalize_email(email)
@@ -117,12 +118,18 @@ def _ensure_user(
                 f"not {role.value}."
             )
         changed = False
+        state_parts: list[str] = []
         if not user.is_active:
             user.is_active = True
             changed = True
+            state_parts.append("reactivated")
+        if reset_password:
+            user.password_hash = hash_password(password)
+            changed = True
+            state_parts.append("password reset")
         if changed:
             session.commit()
-            return user, "reactivated; password preserved"
+            return user, "; ".join(state_parts)
         return user, "existing; password preserved"
 
     user = User(
@@ -366,6 +373,7 @@ def _ensure_approved_record(
 def seed_demo(session: Session) -> dict[str, str]:
     """Seed accounts and one approved synthetic record into an upgraded schema."""
 
+    settings = get_settings()
     passwords = _required_passwords()
     account_states: dict[Role, str] = {}
     accounts: dict[Role, User] = {}
@@ -375,7 +383,10 @@ def seed_demo(session: Session) -> dict[str, str]:
         Role.EXPERT_REVIEWER,
     ):
         account, state = _ensure_user(
-            session, role=role, password=passwords[role]
+            session,
+            role=role,
+            password=passwords[role],
+            reset_password=settings.demo_reset_passwords,
         )
         accounts[role] = account
         account_states[role] = state
@@ -389,7 +400,7 @@ def seed_demo(session: Session) -> dict[str, str]:
         student=accounts[Role.STUDENT],
         template=template,
     )
-    image_store = image_store_from_settings(get_settings())
+    image_store = image_store_from_settings(settings)
     specimen, image, specimen_state, image_state = _ensure_specimen_and_image(
         session,
         student=accounts[Role.STUDENT],

@@ -125,6 +125,10 @@ streamlit run app.py
 For the first empty hosted demo, `WBR_AUTO_BOOTSTRAP_DEMO = "true"` can apply
 migrations and seed synthetic users on startup. After confirming the app starts,
 set it back to `"false"` so future startup does not perform demo provisioning.
+If the demo accounts were seeded with the wrong passwords, temporarily set
+`WBR_DEMO_RESET_PASSWORDS = "true"` together with
+`WBR_AUTO_BOOTSTRAP_DEMO = "true"`, reboot once, confirm login, then set both
+values back to `"false"`.
 
 The database and R2 bucket must be backed up together. Run the seed command only
 for an explicit demonstration environment; production users and expert
@@ -160,6 +164,7 @@ does not pretend that browser-level image scaling provides scientific zoom.
 | `WBR_DATA_DIR` | Immutable image storage root | `data` |
 | `WBR_MAX_UPLOAD_MB` | Maximum original upload size | `25` |
 | `WBR_AUTO_BOOTSTRAP_DEMO` | Auto-migrate/seed disposable hosted demo | `false` |
+| `WBR_DEMO_RESET_PASSWORDS` | Reset existing demo account passwords from env on next bootstrap | `false` |
 | `WBR_R2_ENDPOINT_URL` | Cloudflare R2 S3 endpoint URL | none |
 | `WBR_R2_BUCKET_NAME` | Cloudflare R2 bucket for original images | none |
 | `WBR_R2_ACCESS_KEY_ID` | R2 access key ID | none |
@@ -204,6 +209,7 @@ WBR_R2_ACCESS_KEY_ID = "<r2-access-key-id>"
 WBR_R2_SECRET_ACCESS_KEY = "<r2-secret-access-key>"
 WBR_R2_KEY_PREFIX = "originals/"
 WBR_AUTO_BOOTSTRAP_DEMO = "true"
+WBR_DEMO_RESET_PASSWORDS = "false"
 WBR_DEMO_ADMIN_PASSWORD = "choose-a-distinct-long-password"
 WBR_DEMO_STUDENT_PASSWORD = "choose-another-distinct-long-password"
 WBR_DEMO_REVIEWER_PASSWORD = "choose-a-third-distinct-long-password"

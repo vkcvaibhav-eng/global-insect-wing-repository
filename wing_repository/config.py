@@ -19,6 +19,7 @@ DEFAULT_DATABASE_URL = "sqlite:///data/wing_repository.db"
 DEFAULT_DATA_DIR = Path("data")
 DEFAULT_MAX_UPLOAD_MB = 25
 DEFAULT_AUTO_BOOTSTRAP_DEMO = False
+DEFAULT_DEMO_RESET_PASSWORDS = False
 DEFAULT_STORAGE_BACKEND = "local"
 
 
@@ -49,6 +50,7 @@ class Settings:
     data_dir: Path = DEFAULT_DATA_DIR
     max_upload_mb: int = DEFAULT_MAX_UPLOAD_MB
     auto_bootstrap_demo: bool = DEFAULT_AUTO_BOOTSTRAP_DEMO
+    demo_reset_passwords: bool = DEFAULT_DEMO_RESET_PASSWORDS
     storage_backend: str = DEFAULT_STORAGE_BACKEND
     r2_endpoint_url: str | None = None
     r2_bucket_name: str | None = None
@@ -95,6 +97,13 @@ class Settings:
                     str(DEFAULT_AUTO_BOOTSTRAP_DEMO),
                 ),
                 "WBR_AUTO_BOOTSTRAP_DEMO",
+            ),
+            demo_reset_passwords=_environment_bool(
+                os.getenv(
+                    "WBR_DEMO_RESET_PASSWORDS",
+                    str(DEFAULT_DEMO_RESET_PASSWORDS),
+                ),
+                "WBR_DEMO_RESET_PASSWORDS",
             ),
             storage_backend=storage_backend,
             r2_endpoint_url=os.getenv("WBR_R2_ENDPOINT_URL"),

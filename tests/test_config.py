@@ -24,6 +24,12 @@ def test_demo_bootstrap_rejects_ambiguous_environment(monkeypatch) -> None:
         Settings.from_env()
 
 
+def test_demo_password_reset_flag_uses_environment_bool(monkeypatch) -> None:
+    monkeypatch.setenv("WBR_DEMO_RESET_PASSWORDS", "yes")
+
+    assert Settings.from_env().demo_reset_passwords
+
+
 def test_default_storage_backend_is_local(monkeypatch) -> None:
     monkeypatch.delenv("WBR_STORAGE_BACKEND", raising=False)
     settings = Settings.from_env()
