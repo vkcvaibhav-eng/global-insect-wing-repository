@@ -29,6 +29,9 @@ dev = [
 [tool.setuptools.packages.find]
 include = ["wing_repository*"]
 
+[tool.poetry]
+package-mode = false
+
 [tool.pytest.ini_options]
 addopts = "-ra"
 pythonpath = ["."]
