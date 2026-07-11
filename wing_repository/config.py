@@ -22,6 +22,16 @@ DEFAULT_AUTO_BOOTSTRAP_DEMO = False
 DEFAULT_STORAGE_BACKEND = "local"
 
 
+def _normalize_database_url(value: str) -> str:
+    """Prefer the installed psycopg v3 driver for provider PostgreSQL URLs."""
+
+    if value.startswith("postgresql://"):
+        return "postgresql+psycopg://" + value.removeprefix("postgresql://")
+    if value.startswith("postgres://"):
+        return "postgresql+psycopg://" + value.removeprefix("postgres://")
+    return value
+
+
 def _environment_bool(value: str, variable_name: str) -> bool:
     normalized = value.strip().casefold()
     if normalized in {"1", "true", "yes", "on"}:
@@ -74,7 +84,9 @@ class Settings:
             raise ValueError("WBR_STORAGE_BACKEND must be either 'local' or 'r2'")
 
         return cls(
-            database_url=os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL),
+            database_url=_normalize_database_url(
+                os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
+            ),
             data_dir=Path(os.getenv("WBR_DATA_DIR", str(DEFAULT_DATA_DIR))),
             max_upload_mb=max_upload_mb,
             auto_bootstrap_demo=_environment_bool(

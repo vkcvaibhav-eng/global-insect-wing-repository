@@ -29,10 +29,17 @@ def _render_login(session: Session) -> None:
         "administrator. Credentials are never embedded in the application."
     )
     if get_settings().auto_bootstrap_demo:
-        st.warning(
-            "Hosted demonstration mode uses disposable SQLite storage. Data "
-            "can be reset when the app restarts or is redeployed."
-        )
+        settings = get_settings()
+        if settings.database_url.startswith("sqlite:"):
+            st.warning(
+                "Hosted demonstration mode uses disposable SQLite storage. Data "
+                "can be reset when the app restarts or is redeployed."
+            )
+        else:
+            st.info(
+                "Demo bootstrap is enabled for startup provisioning. After the "
+                "first successful run, set WBR_AUTO_BOOTSTRAP_DEMO to false."
+            )
     with st.form("login_form", clear_on_submit=False):
         email = st.text_input("Email", autocomplete="email")
         password = st.text_input(

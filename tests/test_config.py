@@ -55,3 +55,30 @@ def test_storage_backend_rejects_unknown_value(monkeypatch) -> None:
 
     with pytest.raises(ValueError, match="WBR_STORAGE_BACKEND"):
         Settings.from_env()
+
+
+@pytest.mark.parametrize(
+    ("provided", "expected"),
+    [
+        (
+            "postgresql://user:pass@example.neon.tech/db?sslmode=require",
+            "postgresql+psycopg://user:pass@example.neon.tech/db?sslmode=require",
+        ),
+        (
+            "postgres://user:pass@example.neon.tech/db?sslmode=require",
+            "postgresql+psycopg://user:pass@example.neon.tech/db?sslmode=require",
+        ),
+        (
+            "postgresql+psycopg://user:pass@example.neon.tech/db?sslmode=require",
+            "postgresql+psycopg://user:pass@example.neon.tech/db?sslmode=require",
+        ),
+    ],
+)
+def test_postgresql_urls_use_installed_psycopg_driver(
+    monkeypatch,
+    provided: str,
+    expected: str,
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", provided)
+
+    assert Settings.from_env().database_url == expected
