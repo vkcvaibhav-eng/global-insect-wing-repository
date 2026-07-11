@@ -18,7 +18,7 @@ flowchart LR
     UI["Streamlit pages"] --> SVC["Domain services"]
     SVC --> ORM["SQLAlchemy models"]
     ORM --> DB[("SQLite demo / PostgreSQL production")]
-    SVC --> STORE["Immutable original-image storage"]
+    SVC --> STORE["Immutable original-image storage<br/>local demo or Cloudflare R2"]
     SVC --> EXP["CSV and TPS serializers"]
 ```
 
@@ -123,7 +123,18 @@ Uploaded bytes are validated with Pillow, hashed with SHA-256, and written once
 under a generated storage key. The application never rewrites an existing
 original. Display overlays are generated in memory and are not substitutes for
 the original. The database stores the original filename, byte count, checksum,
-MIME type, and source-raster dimensions.
+MIME type, source-raster dimensions, and immutable storage key.
+
+Version 0.1 supports two original-image storage backends behind the same
+service interface:
+
+- `local` writes under `WBR_DATA_DIR/originals` for development and disposable
+  single-user demonstrations.
+- `r2` writes to Cloudflare R2 through its S3-compatible API for hosted
+  Streamlit deployments where local files are ephemeral.
+
+The database remains the authoritative index for image metadata and scientific
+records. Object storage is the authoritative source for original image bytes.
 
 ## Approval and accession transaction
 
@@ -161,11 +172,12 @@ be tested rather than inferred.
 
 ## Deployment and secrets
 
-Configuration comes from environment variables. SQLite is the documented local
-default; production uses a PostgreSQL SQLAlchemy URL and a writable persistent
-image volume. Passwords are stored as salted PBKDF2 hashes. Demo account
-passwords are read by the seed command from environment variables and are not
-embedded in application source.
+Configuration comes from environment variables. SQLite plus local image storage
+is the documented local default. Hosted or multi-user deployments use a
+PostgreSQL SQLAlchemy URL and durable object storage, currently Cloudflare R2.
+Passwords are stored as salted PBKDF2 hashes. Demo account passwords are read
+by the seed command from environment variables and are not embedded in
+application source.
 
 ## Future-safe constraints
 

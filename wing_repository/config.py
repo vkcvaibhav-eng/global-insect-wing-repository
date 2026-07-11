@@ -19,6 +19,7 @@ DEFAULT_DATABASE_URL = "sqlite:///data/wing_repository.db"
 DEFAULT_DATA_DIR = Path("data")
 DEFAULT_MAX_UPLOAD_MB = 25
 DEFAULT_AUTO_BOOTSTRAP_DEMO = False
+DEFAULT_STORAGE_BACKEND = "local"
 
 
 def _environment_bool(value: str, variable_name: str) -> bool:
@@ -38,6 +39,12 @@ class Settings:
     data_dir: Path = DEFAULT_DATA_DIR
     max_upload_mb: int = DEFAULT_MAX_UPLOAD_MB
     auto_bootstrap_demo: bool = DEFAULT_AUTO_BOOTSTRAP_DEMO
+    storage_backend: str = DEFAULT_STORAGE_BACKEND
+    r2_endpoint_url: str | None = None
+    r2_bucket_name: str | None = None
+    r2_access_key_id: str | None = None
+    r2_secret_access_key: str | None = None
+    r2_key_prefix: str = "originals/"
 
     @property
     def original_image_dir(self) -> Path:
@@ -61,6 +68,10 @@ class Settings:
             raise ValueError("WBR_MAX_UPLOAD_MB must be an integer") from exc
         if max_upload_mb <= 0:
             raise ValueError("WBR_MAX_UPLOAD_MB must be positive")
+        storage_backend = os.getenv("WBR_STORAGE_BACKEND", DEFAULT_STORAGE_BACKEND)
+        storage_backend = storage_backend.strip().casefold()
+        if storage_backend not in {"local", "r2"}:
+            raise ValueError("WBR_STORAGE_BACKEND must be either 'local' or 'r2'")
 
         return cls(
             database_url=os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL),
@@ -73,6 +84,12 @@ class Settings:
                 ),
                 "WBR_AUTO_BOOTSTRAP_DEMO",
             ),
+            storage_backend=storage_backend,
+            r2_endpoint_url=os.getenv("WBR_R2_ENDPOINT_URL"),
+            r2_bucket_name=os.getenv("WBR_R2_BUCKET_NAME"),
+            r2_access_key_id=os.getenv("WBR_R2_ACCESS_KEY_ID"),
+            r2_secret_access_key=os.getenv("WBR_R2_SECRET_ACCESS_KEY"),
+            r2_key_prefix=os.getenv("WBR_R2_KEY_PREFIX", "originals/"),
         )
 
 

@@ -34,7 +34,7 @@ from .errors import (
     TemplateVersionMismatchError,
     ValidationError,
 )
-from .image_store import LocalImageStore, StoredImage
+from .image_store import ImageStore, StoredImage
 from .models import (
     Annotation,
     AnnotationPoint,
@@ -390,7 +390,7 @@ def _wing_image_from_stored(
 def attach_wing_image(
     session: Session,
     actor: User,
-    image_store: LocalImageStore,
+    image_store: ImageStore,
     *,
     specimen_id: int,
     image_bytes: bytes,
@@ -416,7 +416,7 @@ def attach_wing_image(
 def create_specimen_with_image(
     session: Session,
     actor: User,
-    image_store: LocalImageStore,
+    image_store: ImageStore,
     *,
     specimen_code: str,
     image_bytes: bytes,

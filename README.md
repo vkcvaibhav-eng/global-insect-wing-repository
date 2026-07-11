@@ -31,6 +31,7 @@ See [the architecture](docs/ARCHITECTURE.md) and
 - Python 3.11 or newer
 - SQLite for the single-user local demonstration
 - PostgreSQL for production/concurrent use
+- Cloudflare R2 or another durable object store for hosted original images
 
 ## Install
 
@@ -96,20 +97,38 @@ upgrade smoke test. SQLite foreign-key enforcement is enabled on every
 connection. Concurrency and row-lock behavior must additionally be tested
 against PostgreSQL before production deployment.
 
-## PostgreSQL deployment
+## Persistent Streamlit Cloud deployment
 
-Install the project as above and set a PostgreSQL SQLAlchemy URL, for example:
+For a persistent hosted demo, keep Streamlit Cloud for the app but move state
+out of Streamlit's ephemeral filesystem:
+
+1. Create a Neon or Supabase PostgreSQL database.
+2. Create a Cloudflare R2 bucket for original wing-image uploads.
+3. Add R2 API credentials with object read/write access to that bucket.
+4. Configure Streamlit Cloud secrets with a PostgreSQL `DATABASE_URL` and
+   `WBR_STORAGE_BACKEND = "r2"`.
+
+Example local PowerShell configuration:
 
 ```powershell
-$env:DATABASE_URL = "postgresql+psycopg://wbr:secret@db.example.org/wbr"
+$env:DATABASE_URL = "postgresql+psycopg://wbr:secret@db.example.org/wbr?sslmode=require"
+$env:WBR_STORAGE_BACKEND = "r2"
+$env:WBR_R2_ENDPOINT_URL = "https://<account-id>.r2.cloudflarestorage.com"
+$env:WBR_R2_BUCKET_NAME = "wing-originals"
+$env:WBR_R2_ACCESS_KEY_ID = "<r2-access-key-id>"
+$env:WBR_R2_SECRET_ACCESS_KEY = "<r2-secret-access-key>"
+$env:WBR_R2_KEY_PREFIX = "originals/"
 alembic upgrade head
 streamlit run app.py
 ```
 
-`WBR_DATA_DIR` must be a durable, backed-up volume. The database and original
-image store must be backed up together. Run the seed command only for an
-explicit demonstration environment; production users and expert templates
-should be provisioned through reviewed administrative procedures.
+For the first empty hosted demo, `WBR_AUTO_BOOTSTRAP_DEMO = "true"` can apply
+migrations and seed synthetic users on startup. After confirming the app starts,
+set it back to `"false"` so future startup does not perform demo provisioning.
+
+The database and R2 bucket must be backed up together. Run the seed command only
+for an explicit demonstration environment; production users and expert
+templates should be provisioned through reviewed administrative procedures.
 
 ## Landmark template JSON
 
@@ -137,9 +156,15 @@ does not pretend that browser-level image scaling provides scientific zoom.
 | Variable | Purpose | Default |
 |---|---|---|
 | `DATABASE_URL` | SQLAlchemy database URL | `sqlite:///data/wing_repository.db` |
+| `WBR_STORAGE_BACKEND` | Original-image store: `local` or `r2` | `local` |
 | `WBR_DATA_DIR` | Immutable image storage root | `data` |
 | `WBR_MAX_UPLOAD_MB` | Maximum original upload size | `25` |
 | `WBR_AUTO_BOOTSTRAP_DEMO` | Auto-migrate/seed disposable hosted demo | `false` |
+| `WBR_R2_ENDPOINT_URL` | Cloudflare R2 S3 endpoint URL | none |
+| `WBR_R2_BUCKET_NAME` | Cloudflare R2 bucket for original images | none |
+| `WBR_R2_ACCESS_KEY_ID` | R2 access key ID | none |
+| `WBR_R2_SECRET_ACCESS_KEY` | R2 secret access key | none |
+| `WBR_R2_KEY_PREFIX` | Prefix for newly uploaded R2 objects | `originals/` |
 | `WBR_DEMO_ADMIN_PASSWORD` | Seed-only administrator password | none |
 | `WBR_DEMO_STUDENT_PASSWORD` | Seed-only student password | none |
 | `WBR_DEMO_REVIEWER_PASSWORD` | Seed-only reviewer password | none |
@@ -167,6 +192,26 @@ This mode applies Alembic migrations and creates the synthetic approved sample
 on first startup. Community Cloud's local filesystem is not durable: uploaded
 images and SQLite changes can disappear on restart or redeploy. Use PostgreSQL
 and durable original-image storage for any production or real-data deployment.
+
+For a persistent Streamlit Cloud demo, use root-level secrets like:
+
+```toml
+DATABASE_URL = "postgresql+psycopg://user:password@host/database?sslmode=require"
+WBR_STORAGE_BACKEND = "r2"
+WBR_R2_ENDPOINT_URL = "https://<account-id>.r2.cloudflarestorage.com"
+WBR_R2_BUCKET_NAME = "wing-originals"
+WBR_R2_ACCESS_KEY_ID = "<r2-access-key-id>"
+WBR_R2_SECRET_ACCESS_KEY = "<r2-secret-access-key>"
+WBR_R2_KEY_PREFIX = "originals/"
+WBR_AUTO_BOOTSTRAP_DEMO = "true"
+WBR_DEMO_ADMIN_PASSWORD = "choose-a-distinct-long-password"
+WBR_DEMO_STUDENT_PASSWORD = "choose-another-distinct-long-password"
+WBR_DEMO_REVIEWER_PASSWORD = "choose-a-third-distinct-long-password"
+```
+
+After the first successful startup, change `WBR_AUTO_BOOTSTRAP_DEMO` to
+`"false"`. Keep GitHub for source code only; do not push SQLite databases or
+uploaded wing images into the repository.
 
 ## Repository layout
 

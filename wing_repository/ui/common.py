@@ -9,20 +9,17 @@ import pandas as pd
 import streamlit as st
 
 from wing_repository.config import get_settings
-from wing_repository.image_store import LocalImageStore
+from wing_repository.image_store import ImageStore, image_store_from_settings
 from wing_repository.models import Annotation
 from wing_repository.ui.image_overlay import OverlayPoint, build_numbered_overlay
 
 
 @st.cache_resource
-def image_store() -> LocalImageStore:
-    """Return the process-wide local immutable image store."""
+def image_store() -> ImageStore:
+    """Return the process-wide immutable image store."""
 
     settings = get_settings()
-    return LocalImageStore(
-        settings.original_image_dir,
-        max_bytes=settings.max_upload_mb * 1024 * 1024,
-    )
+    return image_store_from_settings(settings)
 
 
 def annotation_point_rows(annotation: Annotation) -> list[dict[str, Any]]:

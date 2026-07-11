@@ -22,7 +22,7 @@ from wing_repository.demo_data import (
 )
 from wing_repository.enums import AnnotationStatus, Role
 from wing_repository.errors import ConflictError, RepositoryError
-from wing_repository.image_store import LocalImageStore
+from wing_repository.image_store import ImageStore, image_store_from_settings
 from wing_repository.models import (
     Annotation,
     Assignment,
@@ -200,7 +200,7 @@ def _ensure_specimen_and_image(
     *,
     student: User,
     assignment: Assignment,
-    image_store: LocalImageStore,
+    image_store: ImageStore,
 ) -> tuple[Specimen, WingImage, str, str]:
     specimen = session.scalar(
         select(Specimen).where(
@@ -389,7 +389,7 @@ def seed_demo(session: Session) -> dict[str, str]:
         student=accounts[Role.STUDENT],
         template=template,
     )
-    image_store = LocalImageStore.from_settings(get_settings())
+    image_store = image_store_from_settings(get_settings())
     specimen, image, specimen_state, image_state = _ensure_specimen_and_image(
         session,
         student=accounts[Role.STUDENT],
