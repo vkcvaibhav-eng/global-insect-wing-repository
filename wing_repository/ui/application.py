@@ -6,10 +6,12 @@ from collections.abc import Callable
 import logging
 
 import streamlit as st
-from sqlalchemy import inspect, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from wing_repository.db import SessionLocal, engine
+from wing_repository.bootstrap import ensure_database_ready
+from wing_repository.config import get_settings
 from wing_repository.enums import Role
 from wing_repository.errors import RepositoryError, ValidationError
 from wing_repository.models import User
@@ -26,6 +28,11 @@ def _render_login(session: Session) -> None:
         "Sign in with an account created by the demonstration seed or an "
         "administrator. Credentials are never embedded in the application."
     )
+    if get_settings().auto_bootstrap_demo:
+        st.warning(
+            "Hosted demonstration mode uses disposable SQLite storage. Data "
+            "can be reset when the app restarts or is redeployed."
+        )
     with st.form("login_form", clear_on_submit=False):
         email = st.text_input("Email", autocomplete="email")
         password = st.text_input(
@@ -110,10 +117,14 @@ def run() -> None:
         layout="wide",
     )
     try:
-        schema_ready = inspect(engine).has_table("users")
+        schema_ready = ensure_database_ready()
     except Exception:
-        st.error("The configured database cannot be reached.")
-        st.code("Check DATABASE_URL, then run: alembic upgrade head")
+        logger.exception("Database initialization failed")
+        st.error("The configured database could not be initialized.")
+        st.code(
+            "Check DATABASE_URL and demo bootstrap secrets, then run: "
+            "alembic upgrade head"
+        )
         st.stop()
     if not schema_ready:
         st.warning("The database schema has not been created yet.")

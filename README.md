@@ -139,6 +139,7 @@ does not pretend that browser-level image scaling provides scientific zoom.
 | `DATABASE_URL` | SQLAlchemy database URL | `sqlite:///data/wing_repository.db` |
 | `WBR_DATA_DIR` | Immutable image storage root | `data` |
 | `WBR_MAX_UPLOAD_MB` | Maximum original upload size | `25` |
+| `WBR_AUTO_BOOTSTRAP_DEMO` | Auto-migrate/seed disposable hosted demo | `false` |
 | `WBR_DEMO_ADMIN_PASSWORD` | Seed-only administrator password | none |
 | `WBR_DEMO_STUDENT_PASSWORD` | Seed-only student password | none |
 | `WBR_DEMO_REVIEWER_PASSWORD` | Seed-only reviewer password | none |
@@ -147,6 +148,25 @@ Passwords are salted and hashed before storage. The local authentication layer
 is for this milestone; production still requires HTTPS, hardened sessions,
 account lifecycle management, audit logging, rate limiting, and a security
 review.
+
+## Streamlit Community Cloud demonstration
+
+For a disposable demonstration deployment, configure these root-level secrets
+in Streamlit Community Cloud before starting the app:
+
+```toml
+DATABASE_URL = "sqlite:///data/wing_repository.db"
+WBR_DATA_DIR = "data"
+WBR_AUTO_BOOTSTRAP_DEMO = "true"
+WBR_DEMO_ADMIN_PASSWORD = "choose-a-distinct-long-password"
+WBR_DEMO_STUDENT_PASSWORD = "choose-another-distinct-long-password"
+WBR_DEMO_REVIEWER_PASSWORD = "choose-a-third-distinct-long-password"
+```
+
+This mode applies Alembic migrations and creates the synthetic approved sample
+on first startup. Community Cloud's local filesystem is not durable: uploaded
+images and SQLite changes can disappear on restart or redeploy. Use PostgreSQL
+and durable original-image storage for any production or real-data deployment.
 
 ## Repository layout
 

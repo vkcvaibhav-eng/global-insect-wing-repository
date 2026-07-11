@@ -18,6 +18,16 @@ from dotenv import load_dotenv
 DEFAULT_DATABASE_URL = "sqlite:///data/wing_repository.db"
 DEFAULT_DATA_DIR = Path("data")
 DEFAULT_MAX_UPLOAD_MB = 25
+DEFAULT_AUTO_BOOTSTRAP_DEMO = False
+
+
+def _environment_bool(value: str, variable_name: str) -> bool:
+    normalized = value.strip().casefold()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"{variable_name} must be true or false")
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,6 +37,7 @@ class Settings:
     database_url: str = DEFAULT_DATABASE_URL
     data_dir: Path = DEFAULT_DATA_DIR
     max_upload_mb: int = DEFAULT_MAX_UPLOAD_MB
+    auto_bootstrap_demo: bool = DEFAULT_AUTO_BOOTSTRAP_DEMO
 
     @property
     def original_image_dir(self) -> Path:
@@ -55,6 +66,13 @@ class Settings:
             database_url=os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL),
             data_dir=Path(os.getenv("WBR_DATA_DIR", str(DEFAULT_DATA_DIR))),
             max_upload_mb=max_upload_mb,
+            auto_bootstrap_demo=_environment_bool(
+                os.getenv(
+                    "WBR_AUTO_BOOTSTRAP_DEMO",
+                    str(DEFAULT_AUTO_BOOTSTRAP_DEMO),
+                ),
+                "WBR_AUTO_BOOTSTRAP_DEMO",
+            ),
         )
 
 
