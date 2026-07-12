@@ -3,16 +3,21 @@
 from __future__ import annotations
 
 from datetime import date
+from hashlib import sha1
 import math
 from pathlib import Path
 
 import pandas as pd
+from PIL import Image
 import streamlit as st
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 from streamlit_image_coordinates import streamlit_image_coordinates
 
-from wing_repository.coordinates import click_event_token, coordinate_from_click_event
+from wing_repository.coordinates import (
+    click_event_token,
+    coordinate_from_viewport_click_event,
+)
 from wing_repository.enums import AnnotationStatus, SpeciesIdentificationMethod
 from wing_repository.errors import NotFoundError, RepositoryError, ValidationError
 from wing_repository.models import (
@@ -49,7 +54,11 @@ from wing_repository.ui.common import (
     image_store,
     move_to_page,
 )
-from wing_repository.ui.image_overlay import OverlayPoint, build_numbered_overlay
+from wing_repository.ui.image_overlay import (
+    ImageViewport,
+    OverlayPoint,
+    build_numbered_viewport_overlay,
+)
 
 
 CALIBRATION_UNITS = (
@@ -404,9 +413,53 @@ def _create_or_open_draft(session: Session, user: User) -> None:
         st.rerun()
 
 
-def _display_width_for_zoom(source_width: int, zoom_percent: int) -> int:
-    base_width = min(max(source_width, 1), 900)
-    return max(100, min(3200, round(base_width * zoom_percent / 100)))
+def _display_width_for_viewport(source_width: int) -> int:
+    return max(100, min(max(source_width, 1), 1_100))
+
+
+def _viewport_from_controls(
+    *,
+    key_prefix: str,
+    source_width: int,
+    source_height: int,
+    zoom_percent: int,
+) -> ImageViewport:
+    """Render pan controls and return a source-raster viewport."""
+
+    zoom = max(100, int(zoom_percent))
+    viewport_width = max(1, min(source_width, round(source_width * 100 / zoom)))
+    viewport_height = max(1, min(source_height, round(source_height * 100 / zoom)))
+    max_left = max(0, source_width - viewport_width)
+    max_top = max(0, source_height - viewport_height)
+    if max_left == 0 and max_top == 0:
+        st.caption("Increase zoom above 100% to enable image movement.")
+        return ImageViewport(left=0, top=0, width=viewport_width, height=viewport_height)
+
+    pan_x_key = f"{key_prefix}_pan_x"
+    pan_y_key = f"{key_prefix}_pan_y"
+    st.session_state.setdefault(pan_x_key, 0)
+    st.session_state.setdefault(pan_y_key, 0)
+    move_columns = st.columns(2)
+    horizontal_percent = move_columns[0].slider(
+        "Move image left/right",
+        min_value=0,
+        max_value=100,
+        step=1,
+        key=pan_x_key,
+    )
+    vertical_percent = move_columns[1].slider(
+        "Move image up/down",
+        min_value=0,
+        max_value=100,
+        step=1,
+        key=pan_y_key,
+    )
+    return ImageViewport(
+        left=round(max_left * horizontal_percent / 100),
+        top=round(max_top * vertical_percent / 100),
+        width=viewport_width,
+        height=viewport_height,
+    )
 
 
 def _render_template_reference_guide(guide: TemplateReferenceGuide) -> None:
@@ -414,14 +467,49 @@ def _render_template_reference_guide(guide: TemplateReferenceGuide) -> None:
     if guide.warning:
         st.info(guide.warning)
     source = guide.source
-    if not source.startswith(("https://", "http://")) and not Path(source).exists():
+    if source.startswith(("https://", "http://")):
+        st.image(source, caption=guide.caption, width="stretch")
+        st.caption("Move controls are available for bundled/local guide images.")
+        if guide.citation:
+            st.caption(guide.citation)
+        return
+    source_path = Path(source)
+    if not source_path.exists():
         st.warning(
             "This template declares a reference image, but the file is not "
             "available in this deployment."
         )
         st.code(source)
         return
-    st.image(source, caption=guide.caption, width="stretch")
+    guide_key = sha1(str(source_path).encode("utf-8")).hexdigest()[:12]
+    guide_zoom = st.select_slider(
+        "Template guide zoom",
+        options=ZOOM_PERCENTAGES,
+        value=100,
+        format_func=lambda value: f"{value}%",
+        key=f"guide_zoom_{guide_key}",
+    )
+    with Image.open(source_path) as guide_image:
+        display_source = guide_image.convert("RGB")
+    viewport = _viewport_from_controls(
+        key_prefix=f"guide_{guide_key}",
+        source_width=display_source.width,
+        source_height=display_source.height,
+        zoom_percent=int(guide_zoom),
+    )
+    guide_view = display_source.crop(
+        (viewport.left, viewport.top, viewport.right, viewport.bottom)
+    )
+    display_width = _display_width_for_viewport(display_source.width)
+    if guide_view.width != display_width:
+        guide_view = guide_view.resize(
+            (
+                display_width,
+                max(1, round(guide_view.height * display_width / guide_view.width)),
+            ),
+            resample=Image.Resampling.LANCZOS,
+        )
+    st.image(guide_view, caption=guide.caption, width=guide_view.width)
     if guide.citation:
         st.caption(guide.citation)
 
@@ -429,19 +517,34 @@ def _render_template_reference_guide(guide: TemplateReferenceGuide) -> None:
 def _render_annotation_digitizer(annotation: Annotation, zoom_percent: int):
     st.subheader("Uploaded specimen image")
     st.caption("Click on this image only. These clicks become the saved coordinates.")
-    overlay = annotation_overlay(
-        annotation,
-        max_display_width=_display_width_for_zoom(
-            annotation.image_width,
-            int(zoom_percent),
-        ),
-        allow_upscale=True,
+    viewport = _viewport_from_controls(
+        key_prefix=f"landmark_view_{annotation.id}",
+        source_width=annotation.image_width,
+        source_height=annotation.image_height,
+        zoom_percent=int(zoom_percent),
     )
-    return streamlit_image_coordinates(
+    original = image_store().load_original(annotation.wing_image.storage_key)
+    overlay = build_numbered_viewport_overlay(
+        original,
+        [
+            OverlayPoint(
+                ordinal=point.template_landmark.ordinal,
+                x_pixel=point.x_pixel,
+                y_pixel=point.y_pixel,
+            )
+            for point in annotation.points
+        ],
+        expected_width=annotation.image_width,
+        expected_height=annotation.image_height,
+        viewport=viewport,
+        max_display_width=_display_width_for_viewport(annotation.image_width),
+    )
+    event = streamlit_image_coordinates(
         overlay,
         width=overlay.width,
         key=f"digitizer_{annotation.id}",
     )
+    return event, viewport
 
 
 def _calibration_points_key(wing_image_id: int) -> str:
@@ -533,7 +636,13 @@ def _render_scale_calibration(
     )
 
     original = image_store().load_original(wing_image.storage_key)
-    calibration_overlay = build_numbered_overlay(
+    calibration_viewport = _viewport_from_controls(
+        key_prefix=f"scale_view_{wing_image.id}",
+        source_width=wing_image.image_width,
+        source_height=wing_image.image_height,
+        zoom_percent=int(calibration_zoom),
+    )
+    calibration_overlay = build_numbered_viewport_overlay(
         original,
         [
             OverlayPoint(ordinal=index, x_pixel=x, y_pixel=y)
@@ -541,11 +650,8 @@ def _render_scale_calibration(
         ],
         expected_width=wing_image.image_width,
         expected_height=wing_image.image_height,
-        max_display_width=_display_width_for_zoom(
-            wing_image.image_width,
-            int(calibration_zoom),
-        ),
-        allow_upscale=True,
+        viewport=calibration_viewport,
+        max_display_width=_display_width_for_viewport(wing_image.image_width),
         marker_style="scale_endpoint",
     )
     event = streamlit_image_coordinates(
@@ -558,10 +664,14 @@ def _render_scale_calibration(
         token_key = f"wbr_last_scale_click_{wing_image.id}"
         if token != st.session_state.get(token_key):
             st.session_state[token_key] = token
-            coordinate = coordinate_from_click_event(
+            coordinate = coordinate_from_viewport_click_event(
                 event,
                 original_width=wing_image.image_width,
                 original_height=wing_image.image_height,
+                viewport_left=calibration_viewport.left,
+                viewport_top=calibration_viewport.top,
+                viewport_width=calibration_viewport.width,
+                viewport_height=calibration_viewport.height,
             )
             updated_points = [*calibration_points, (coordinate.x_pixel, coordinate.y_pixel)]
             st.session_state[_calibration_points_key(wing_image.id)] = updated_points[-2:]
@@ -674,10 +784,16 @@ def render_digitization(session: Session, user: User) -> None:
     )
     guide = template_reference_guide(annotation.template)
     if guide is None:
-        event = _render_annotation_digitizer(annotation, int(zoom_percent))
+        event, landmark_viewport = _render_annotation_digitizer(
+            annotation,
+            int(zoom_percent),
+        )
     else:
         _render_template_reference_guide(guide)
-        event = _render_annotation_digitizer(annotation, int(zoom_percent))
+        event, landmark_viewport = _render_annotation_digitizer(
+            annotation,
+            int(zoom_percent),
+        )
     if event is not None:
         token = click_event_token(event)
         token_key = f"wbr_last_click_{annotation.id}"
@@ -688,10 +804,14 @@ def render_digitization(session: Session, user: User) -> None:
             if next_landmark is None:
                 st.toast("All template landmarks are already placed.")
             else:
-                coordinate = coordinate_from_click_event(
+                coordinate = coordinate_from_viewport_click_event(
                     event,
                     original_width=annotation.image_width,
                     original_height=annotation.image_height,
+                    viewport_left=landmark_viewport.left,
+                    viewport_top=landmark_viewport.top,
+                    viewport_width=landmark_viewport.width,
+                    viewport_height=landmark_viewport.height,
                 )
                 place_annotation_point(
                     session,

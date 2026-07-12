@@ -91,6 +91,42 @@ def map_rendered_click(
     )
 
 
+def map_rendered_viewport_click(
+    click_x: float,
+    click_y: float,
+    rendered_width: float,
+    rendered_height: float,
+    original_width: int,
+    original_height: int,
+    viewport_left: int,
+    viewport_top: int,
+    viewport_width: int,
+    viewport_height: int,
+) -> Coordinate:
+    """Map a click in a rendered cropped viewport to the full source raster."""
+
+    x = _finite_number(click_x, "click_x")
+    y = _finite_number(click_y, "click_y")
+    display_width = _positive_dimension(rendered_width, "rendered_width")
+    display_height = _positive_dimension(rendered_height, "rendered_height")
+    source_width = _positive_dimension(original_width, "original_width")
+    source_height = _positive_dimension(original_height, "original_height")
+    left = _finite_number(viewport_left, "viewport_left")
+    top = _finite_number(viewport_top, "viewport_top")
+    width = _positive_dimension(viewport_width, "viewport_width")
+    height = _positive_dimension(viewport_height, "viewport_height")
+    if left < 0 or top < 0 or left + width > source_width or top + height > source_height:
+        raise ValidationError("Viewport falls outside the original image.")
+    if not 0 <= x < display_width or not 0 <= y < display_height:
+        raise ValidationError("Click falls outside the rendered image.")
+    return normalize_coordinates(
+        left + (x * width / display_width),
+        top + (y * height / display_height),
+        original_width,
+        original_height,
+    )
+
+
 def click_event_token(event: Mapping[str, object]) -> ClickEventToken:
     """Build a stable token used to ignore a component's replayed last click."""
 
@@ -127,4 +163,31 @@ def coordinate_from_click_event(
         event["height"],  # type: ignore[arg-type]
         original_width,
         original_height,
+    )
+
+
+def coordinate_from_viewport_click_event(
+    event: Mapping[str, object],
+    *,
+    original_width: int,
+    original_height: int,
+    viewport_left: int,
+    viewport_top: int,
+    viewport_width: int,
+    viewport_height: int,
+) -> Coordinate:
+    """Validate a component event and map it from a viewport to the source raster."""
+
+    click_event_token(event)
+    return map_rendered_viewport_click(
+        event["x"],  # type: ignore[arg-type]
+        event["y"],  # type: ignore[arg-type]
+        event["width"],  # type: ignore[arg-type]
+        event["height"],  # type: ignore[arg-type]
+        original_width,
+        original_height,
+        viewport_left,
+        viewport_top,
+        viewport_width,
+        viewport_height,
     )

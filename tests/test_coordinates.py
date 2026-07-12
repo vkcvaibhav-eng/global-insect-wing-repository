@@ -7,7 +7,9 @@ import pytest
 from wing_repository.coordinates import (
     click_event_token,
     coordinate_from_click_event,
+    coordinate_from_viewport_click_event,
     map_rendered_click,
+    map_rendered_viewport_click,
     normalize_coordinates,
 )
 from wing_repository.errors import ValidationError
@@ -62,6 +64,42 @@ def test_map_rendered_click_scales_to_original_raster() -> None:
     assert coordinate.y_normalized == pytest.approx(0.5)
 
 
+def test_map_rendered_viewport_click_adds_viewport_offset() -> None:
+    coordinate = map_rendered_viewport_click(
+        click_x=25,
+        click_y=10,
+        rendered_width=50,
+        rendered_height=20,
+        original_width=200,
+        original_height=160,
+        viewport_left=40,
+        viewport_top=30,
+        viewport_width=100,
+        viewport_height=80,
+    )
+
+    assert coordinate.x_pixel == pytest.approx(90)
+    assert coordinate.y_pixel == pytest.approx(70)
+    assert coordinate.x_normalized == pytest.approx(0.45)
+    assert coordinate.y_normalized == pytest.approx(0.4375)
+
+
+def test_viewport_click_rejects_invalid_viewport() -> None:
+    with pytest.raises(ValidationError):
+        map_rendered_viewport_click(
+            click_x=0,
+            click_y=0,
+            rendered_width=50,
+            rendered_height=20,
+            original_width=200,
+            original_height=160,
+            viewport_left=150,
+            viewport_top=0,
+            viewport_width=100,
+            viewport_height=80,
+        )
+
+
 @pytest.mark.parametrize(("x", "y"), [(50, 0), (0, 20), (-1, 0), (0, -1)])
 def test_map_rendered_click_uses_half_open_display_bounds(x: float, y: float) -> None:
     with pytest.raises(ValidationError):
@@ -79,6 +117,22 @@ def test_coordinate_from_click_event_validates_and_maps_event() -> None:
     )
     assert coordinate.x_pixel == pytest.approx(100)
     assert coordinate.y_pixel == pytest.approx(50)
+
+
+def test_coordinate_from_viewport_click_event_validates_and_maps_event() -> None:
+    event = {"unix_time": 1234, "x": 12.5, "y": 5, "width": 25, "height": 10}
+
+    coordinate = coordinate_from_viewport_click_event(
+        event,
+        original_width=200,
+        original_height=100,
+        viewport_left=20,
+        viewport_top=10,
+        viewport_width=100,
+        viewport_height=50,
+    )
+    assert coordinate.x_pixel == pytest.approx(70)
+    assert coordinate.y_pixel == pytest.approx(35)
 
 
 @pytest.mark.parametrize(

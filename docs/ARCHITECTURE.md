@@ -220,18 +220,20 @@ the local single-user development backend.
 
 The milestone uses a small, established Streamlit image-coordinate component
 for reliable click capture. The server creates a numbered overlay after each
-click and saves each mapped coordinate immediately. The first implementation
-supports selectable zoom by rendering a larger display derivative while still
-mapping click events back to the immutable original raster. Scale calibration
-uses the same click-mapping path to record two reference endpoints. Undo-last
-and explicit point deletion are handled by ordinary Streamlit controls.
+click and saves each mapped coordinate immediately. The implementation supports
+selectable zoom plus viewport move controls: at higher zoom levels the app
+renders a cropped source-raster viewport and maps each click back through the
+viewport offset to the immutable original raster. Scale calibration uses the
+same viewport-aware click-mapping path to record two reference endpoints.
+Undo-last and explicit point deletion are handled by ordinary Streamlit
+controls.
 
-A production-quality interaction with cursor-centered zoom, pan, hit-testing,
-drag-to-adjust, touch/pen input, keyboard shortcuts, and a continuously updated
-high-resolution overlay requires a purpose-built Streamlit TypeScript
-component. That component is an explicit future boundary; it must return both
-the rendered viewport transform and coordinates so original-pixel mapping can
-be tested rather than inferred.
+A production-quality interaction with cursor-centered zoom, mouse-drag pan,
+hit-testing, drag-to-adjust, touch/pen input, keyboard shortcuts, and a
+continuously updated high-resolution overlay requires a purpose-built
+Streamlit TypeScript component. That component is an explicit future boundary;
+it must return both the rendered viewport transform and coordinates so
+original-pixel mapping can be tested rather than inferred.
 
 ## Deployment and secrets
 

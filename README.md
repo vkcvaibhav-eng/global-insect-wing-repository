@@ -237,17 +237,17 @@ See:
 
 ## Digitizer capabilities and boundary
 
-The current digitizer supports per-image scale calibration, selectable display
-zoom, numbered sequential placement, immediate coordinate persistence,
-undo-last, explicit deletion/replacement, and a server-rendered landmark
-overlay. Templates may also declare an optional visual reference guide image,
-which is shown beside the uploaded specimen image when available. Every click
-is mapped from the component's actual rendered dimensions to the stored
-original specimen-raster dimensions. Pixel and normalized coordinates are
-preserved; calibrated millimeter coordinates are derived when a saved image
-scale is available.
+The current digitizer supports per-image scale calibration, selectable zoom,
+viewport move controls, numbered sequential placement, immediate coordinate
+persistence, undo-last, explicit deletion/replacement, and a server-rendered
+landmark overlay. Templates may also declare an optional visual reference guide
+image, which is shown above the uploaded specimen image when available. At
+higher zoom levels, the app renders a cropped movable viewport and maps each
+click back to the stored original specimen-raster dimensions. Pixel and
+normalized coordinates are preserved; calibrated millimeter coordinates are
+derived when a saved image scale is available.
 
-Smooth pan, direct point dragging, hit-testing, keyboard nudging,
+Smooth mouse-drag pan, direct point dragging, hit-testing, keyboard nudging,
 high-resolution tiles, and touch/pen interactions still require a purpose-built
 Streamlit TypeScript component. The required event contract and coordinate
 transform safeguards are documented in `docs/ARCHITECTURE.md`.

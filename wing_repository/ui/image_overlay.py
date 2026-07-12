@@ -26,6 +26,24 @@ class OverlayPoint:
     y_pixel: float
 
 
+@dataclass(frozen=True, slots=True)
+class ImageViewport:
+    """A rectangular viewport in original-raster pixel coordinates."""
+
+    left: int
+    top: int
+    width: int
+    height: int
+
+    @property
+    def right(self) -> int:
+        return self.left + self.width
+
+    @property
+    def bottom(self) -> int:
+        return self.top + self.height
+
+
 class OverlayError(ValueError):
     """Raised when an image cannot be rendered consistently."""
 
@@ -85,6 +103,74 @@ def build_numbered_overlay(
         else:
             _draw_landmark_marker(draw, proxy, x, y, str(point.ordinal))
 
+    return proxy
+
+
+def build_numbered_viewport_overlay(
+    original_bytes: bytes,
+    points: Iterable[OverlayPoint],
+    *,
+    expected_width: int,
+    expected_height: int,
+    viewport: ImageViewport,
+    max_display_width: int = 1_100,
+    allow_upscale: bool = True,
+    marker_style: MarkerStyle = "landmark",
+) -> Image.Image:
+    """Return a resized overlay for one cropped source-raster viewport."""
+
+    if expected_width <= 0 or expected_height <= 0 or max_display_width <= 0:
+        raise OverlayError("Image and display dimensions must be positive.")
+    if marker_style not in {"landmark", "scale_endpoint"}:
+        raise OverlayError("Unsupported overlay marker style.")
+    if (
+        viewport.left < 0
+        or viewport.top < 0
+        or viewport.width <= 0
+        or viewport.height <= 0
+        or viewport.right > expected_width
+        or viewport.bottom > expected_height
+    ):
+        raise OverlayError("Viewport must stay inside the original image.")
+
+    try:
+        with Image.open(BytesIO(original_bytes)) as source:
+            source.load()
+            if source.width != expected_width or source.height != expected_height:
+                raise OverlayError(
+                    "Stored image dimensions no longer match the original metadata."
+                )
+            proxy = source.convert("RGB").crop(
+                (viewport.left, viewport.top, viewport.right, viewport.bottom)
+            )
+    except (UnidentifiedImageError, OSError) as exc:
+        raise OverlayError("The stored original image cannot be decoded.") from exc
+
+    should_resize = proxy.width > max_display_width or (
+        allow_upscale and proxy.width != max_display_width
+    )
+    if should_resize:
+        display_height = max(1, round(proxy.height * max_display_width / proxy.width))
+        proxy = proxy.resize(
+            (max_display_width, display_height),
+            resample=Image.Resampling.LANCZOS,
+        )
+
+    scale_x = proxy.width / viewport.width
+    scale_y = proxy.height / viewport.height
+    draw = ImageDraw.Draw(proxy)
+    for point in sorted(points, key=lambda item: item.ordinal):
+        if not (
+            viewport.left <= point.x_pixel < viewport.right
+            and viewport.top <= point.y_pixel < viewport.bottom
+        ):
+            continue
+        x = (point.x_pixel - viewport.left) * scale_x
+        y = (point.y_pixel - viewport.top) * scale_y
+        if marker_style == "scale_endpoint":
+            _draw_scale_endpoint_marker(draw, proxy, x, y, str(point.ordinal))
+        else:
+            _draw_landmark_marker(draw, proxy, x, y, str(point.ordinal))
     return proxy
 
 
