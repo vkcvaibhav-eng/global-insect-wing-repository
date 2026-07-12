@@ -36,6 +36,7 @@ class AnnotationStatus(StringEnum):
     DRAFT = "draft"
     SUBMITTED = "submitted"
     WITHDRAWN = "withdrawn"
+    DELETED = "deleted"
     RETURNED = "returned"
     APPROVED = "approved"
 

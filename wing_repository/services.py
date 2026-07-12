@@ -1107,6 +1107,30 @@ def withdraw_submitted_annotation(
     return annotation
 
 
+def delete_withdrawn_annotation(
+    session: Session,
+    actor: User,
+    *,
+    annotation_id: int,
+) -> Annotation:
+    """Hide a withdrawn, unreviewed submission from the student's workspace."""
+
+    require_active_role(actor, Role.STUDENT)
+    annotation = session.get(Annotation, annotation_id)
+    if annotation is None:
+        raise NotFoundError("Withdrawn annotation was not found.")
+    if annotation.contributor_id != actor.id:
+        raise AuthorizationError("That annotation does not belong to this contributor.")
+    _validate_annotation_links(annotation)
+    if annotation.status is not AnnotationStatus.WITHDRAWN:
+        raise InvalidStateError("Only a withdrawn submission can be deleted.")
+    if annotation.review is not None or annotation.repository_record is not None:
+        raise InvalidStateError("A reviewed annotation cannot be deleted.")
+    annotation.status = AnnotationStatus.DELETED
+    session.commit()
+    return annotation
+
+
 def _reviewable_annotation(
     session: Session,
     actor: User,
@@ -1248,13 +1272,16 @@ def approve_annotation(
 
 
 def list_student_annotations(session: Session, actor: User) -> list[Annotation]:
-    """Return all of the current student's revisions, newest first."""
+    """Return visible current-student revisions, newest first."""
 
     require_active_role(actor, Role.STUDENT)
     return list(
         session.scalars(
             select(Annotation)
-            .where(Annotation.contributor_id == actor.id)
+            .where(
+                Annotation.contributor_id == actor.id,
+                Annotation.status != AnnotationStatus.DELETED,
+            )
             .order_by(Annotation.created_at.desc())
         )
     )
@@ -1299,6 +1326,7 @@ __all__ = [
     "create_specimen",
     "create_specimen_with_image",
     "create_user_account",
+    "delete_withdrawn_annotation",
     "deactivate_assignment",
     "delete_annotation_point",
     "get_active_assignment",

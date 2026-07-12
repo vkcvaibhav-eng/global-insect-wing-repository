@@ -90,6 +90,7 @@ stateDiagram-v2
     [*] --> DRAFT
     DRAFT --> SUBMITTED: complete point set
     SUBMITTED --> WITHDRAWN: contributor withdraws before review
+    WITHDRAWN --> DELETED: contributor deletes from active workspace
     SUBMITTED --> APPROVED: expert approval + accession
     SUBMITTED --> RETURNED: expert requests changes
     RETURNED --> DRAFT: clone as next revision
@@ -101,8 +102,10 @@ A draft can be edited freely. Submission requires exactly one point for every
 ordered template landmark. Once submitted, its point rows are immutable. A
 student may withdraw a submitted annotation before any expert review decision;
 the withdrawn revision remains preserved and is cloned into a new draft
-replacement. A returned annotation also remains preserved and is cloned into a
-new draft revision; the student edits the clone. An approved revision is
+replacement. A withdrawn revision may also be marked deleted, which hides it
+from ordinary student workflow without physically deleting the original image
+or coordinate rows. A returned annotation also remains preserved and is cloned
+into a new draft revision; the student edits the clone. An approved revision is
 terminal and append-only.
 
 Template identity is carried by foreign key throughout the workflow and is

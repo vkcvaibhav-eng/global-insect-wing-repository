@@ -13,9 +13,10 @@
    returned work is revised by cloning it into a new annotation revision.
 6. Draft edits and deleted draft clicks are working state, not repository
    records. Every submitted, returned, and approved coordinate set is retained.
-7. A student may withdraw an unreviewed submission from the expert queue, but
-   the withdrawn coordinate set is retained and any replacement is a new
-   revision.
+7. A student may withdraw an unreviewed submission from the expert queue. A
+   withdrawn submission can then be deleted from the student's active workspace,
+   but this is a soft-delete/discard state; the coordinate set is retained
+   internally and any replacement is a new revision.
 8. Reviewers may not review their own annotations. Administrators can access
    review tools but remain subject to the same contributor-separation rule.
 9. Images are digitized in their encoded raster orientation. Version 0.1 does

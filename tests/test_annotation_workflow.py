@@ -29,10 +29,12 @@ from wing_repository.services import (
     clone_returned_annotation,
     create_draft_annotation,
     create_specimen_with_image,
+    delete_withdrawn_annotation,
     delete_annotation_point,
     place_annotation_point,
     return_annotation,
     list_submitted_annotations,
+    list_student_annotations,
     submit_annotation,
     undo_last_point,
     withdraw_submitted_annotation,
@@ -425,6 +427,39 @@ def test_student_can_withdraw_unreviewed_submission_and_create_replacement(
     ]
 
 
+def test_student_can_delete_withdrawn_submission_from_active_workspace(
+    db_session: Session,
+    student: User,
+    reviewer: User,
+    assignment: Assignment,
+    landmark_template: LandmarkTemplate,
+    image_store: LocalImageStore,
+    image_bytes: bytes,
+) -> None:
+    image = _uploaded_image(db_session, student, assignment, image_store, image_bytes)
+    submitted = submit_annotation(
+        db_session,
+        student,
+        annotation_id=_complete_draft(db_session, student, image, landmark_template).id,
+    )
+    withdrawn = withdraw_submitted_annotation(
+        db_session,
+        student,
+        annotation_id=submitted.id,
+    )
+
+    deleted = delete_withdrawn_annotation(
+        db_session,
+        student,
+        annotation_id=withdrawn.id,
+    )
+
+    assert deleted.status is AnnotationStatus.DELETED
+    assert deleted not in list_student_annotations(db_session, student)
+    assert deleted not in list_submitted_annotations(db_session, reviewer)
+    assert deleted.points
+
+
 def test_student_cannot_withdraw_another_or_reviewed_submission(
     db_session: Session,
     student: User,
@@ -457,6 +492,43 @@ def test_student_cannot_withdraw_another_or_reviewed_submission(
     )
     with pytest.raises(InvalidStateError):
         withdraw_submitted_annotation(
+            db_session,
+            student,
+            annotation_id=submitted.id,
+        )
+
+
+def test_student_cannot_delete_active_or_reviewed_submission(
+    db_session: Session,
+    student: User,
+    reviewer: User,
+    assignment: Assignment,
+    landmark_template: LandmarkTemplate,
+    image_store: LocalImageStore,
+    image_bytes: bytes,
+) -> None:
+    image = _uploaded_image(db_session, student, assignment, image_store, image_bytes)
+    submitted = submit_annotation(
+        db_session,
+        student,
+        annotation_id=_complete_draft(db_session, student, image, landmark_template).id,
+    )
+
+    with pytest.raises(InvalidStateError):
+        delete_withdrawn_annotation(
+            db_session,
+            student,
+            annotation_id=submitted.id,
+        )
+
+    return_annotation(
+        db_session,
+        reviewer,
+        annotation_id=submitted.id,
+        comments="Please revise.",
+    )
+    with pytest.raises(InvalidStateError):
+        delete_withdrawn_annotation(
             db_session,
             student,
             annotation_id=submitted.id,

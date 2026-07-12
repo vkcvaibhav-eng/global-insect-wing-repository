@@ -23,8 +23,10 @@ cross-template morphometric comparison.
    a 1 mm scale bar, then places the template's numbered landmarks with the
    zoomed digitization view.
 5. If a student submits by mistake before expert review, they may withdraw the
-   submission from the review queue and create an editable replacement revision;
-   the withdrawn coordinate set remains preserved.
+   submission from the review queue, create an editable replacement revision,
+   or delete the withdrawn item from their active workspace. Deletion is a
+   soft-delete/discard state; the withdrawn coordinate set remains preserved
+   internally.
 6. An expert approves it or returns it with comments. Returned work is cloned
    into a new editable revision; the reviewed coordinates remain preserved.
 7. Approval atomically creates a permanent accession such as

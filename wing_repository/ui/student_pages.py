@@ -28,6 +28,7 @@ from wing_repository.services import (
     clone_preserved_annotation,
     create_draft_annotation,
     create_specimen,
+    delete_withdrawn_annotation,
     delete_annotation_point,
     get_active_assignment,
     list_student_annotations,
@@ -746,12 +747,27 @@ def render_submissions(session: Session, user: User) -> None:
                 "This withdrawn submission is preserved and no longer appears "
                 "in the expert review queue."
             )
-        if st.button("Create editable replacement", type="primary"):
+        replacement_column, delete_column = st.columns(2)
+        if replacement_column.button(
+            "Create editable replacement",
+            type="primary",
+            width="stretch",
+        ):
             revision = clone_preserved_annotation(
                 session, user, annotation_id=selected.id
             )
             st.session_state["wbr_selected_annotation_id"] = revision.id
             move_to_page("Manual landmark digitization")
+        if (
+            selected.status is AnnotationStatus.WITHDRAWN
+            and delete_column.button(
+                "Delete withdrawn submission",
+                width="stretch",
+            )
+        ):
+            delete_withdrawn_annotation(session, user, annotation_id=selected.id)
+            st.toast("Withdrawn submission deleted from active workspace.")
+            st.rerun()
     elif selected.status is AnnotationStatus.SUBMITTED:
         st.caption(
             "This submitted revision is immutable while awaiting review. If it "
