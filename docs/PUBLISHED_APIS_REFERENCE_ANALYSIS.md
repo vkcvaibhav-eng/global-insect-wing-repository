@@ -53,6 +53,18 @@ The output has three sections:
 External matches are labelled `External published reference`; they are not
 native Global Insect Wing Repository specimens and never receive WBR accessions.
 
+## Activation status
+
+The code is updated, but the analysis is not yet automatically active. It still
+requires:
+
+1. Downloading the Oleksa, Nawrocka and WorkflowHub reference files.
+2. Running the database migration.
+3. Importing the coordinates.
+4. Validating the imported data.
+5. Publishing the Version 2 landmark template.
+6. Building and activating the models.
+
 ## Template
 
 The required template JSON is:

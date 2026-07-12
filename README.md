@@ -189,6 +189,16 @@ specimens and never receive `WBR-HYM-*` accessions. The module expects local
 copies of the published datasets; it does not download research data during
 Streamlit startup.
 
+The code is updated, but the analysis is not yet automatically active. It still
+requires:
+
+1. Downloading the Oleksa, Nawrocka and WorkflowHub reference files.
+2. Running the database migration.
+3. Importing the coordinates.
+4. Validating the imported data.
+5. Publishing the Version 2 landmark template.
+6. Building and activating the models.
+
 Configure local source directories and an artifact directory:
 
 ```powershell

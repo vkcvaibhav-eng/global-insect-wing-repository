@@ -4,8 +4,17 @@ from __future__ import annotations
 
 import pandas as pd
 import streamlit as st
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from wing_repository.enums import AnalysisModelStatus, AnalysisType, TemplateStatus
+from wing_repository.models import (
+    AnalysisModel,
+    Annotation,
+    LandmarkTemplate,
+    User,
+    WingAnalysisRun,
+)
 from wing_repository.analysis_services import (
     NAWROCKA_CITATION,
     OLEKSA_CITATION,
@@ -15,8 +24,19 @@ from wing_repository.analysis_services import (
     published_shape_match_rows,
     run_published_apis_reference_analysis,
 )
-from wing_repository.models import Annotation, User, WingAnalysisRun
 from wing_repository.ui.common import format_template
+
+ANALYSIS_NOT_AUTOMATICALLY_ACTIVE_MESSAGE = (
+    "The code is updated, but the analysis is not yet automatically active."
+)
+ANALYSIS_ACTIVATION_REQUIREMENTS = (
+    "download the Oleksa, Nawrocka and WorkflowHub reference files",
+    "run the database migration",
+    "import the coordinates",
+    "validate the imported data",
+    "publish the Version 2 landmark template",
+    "build and activate the models",
+)
 
 
 def _annotation_label(annotation: Annotation) -> str:
@@ -52,6 +72,58 @@ def _render_scope() -> None:
         "This module is not species identification and does not make molecular, "
         "genomic or definitive lineage claims."
     )
+
+
+def analysis_activation_readiness(session: Session) -> tuple[bool, list[str]]:
+    """Return whether the published Apis analysis is ready to run."""
+
+    missing: list[str] = []
+    template = session.scalar(
+        select(LandmarkTemplate).where(
+            LandmarkTemplate.name == "Apis right forewing standard 19-landmark template",
+            LandmarkTemplate.version == 2,
+        )
+    )
+    if template is None:
+        missing.append("publish the Version 2 landmark template")
+    elif template.status is not TemplateStatus.PUBLISHED:
+        missing.append("publish the Version 2 landmark template")
+
+    active_types = set()
+    if template is not None:
+        active_types = set(
+            session.scalars(
+                select(AnalysisModel.analysis_type).where(
+                    AnalysisModel.model_status == AnalysisModelStatus.ACTIVE,
+                    AnalysisModel.template_id == template.id,
+                )
+            )
+        )
+    required_types = {
+        AnalysisType.APIS_MELLIFERA_EU_REGION,
+        AnalysisType.APIS_MELLIFERA_LINEAGE,
+        AnalysisType.APIS_MELLIFERA_NEAREST_SHAPE,
+    }
+    if active_types & required_types != required_types:
+        missing.append("build and activate the models")
+    return not missing, missing
+
+
+def _render_activation_notice(session: Session) -> bool:
+    ready, missing = analysis_activation_readiness(session)
+    if ready:
+        st.success("Published Apis reference analysis models are active.")
+        return True
+    st.warning(ANALYSIS_NOT_AUTOMATICALLY_ACTIVE_MESSAGE)
+    st.markdown("It still requires:")
+    for requirement in ANALYSIS_ACTIVATION_REQUIREMENTS:
+        marker = "⚠️" if requirement in missing else "•"
+        st.markdown(f"{marker} {requirement}.")
+    st.info(
+        "After these steps are complete, this page will allow complete "
+        "19-landmark Apis right-forewing annotations to be analysed."
+    )
+    return False
 
 
 def _region_table(run: WingAnalysisRun) -> pd.DataFrame:
@@ -135,6 +207,8 @@ def render_published_apis_reference_analysis(session: Session, user: User) -> No
     """Render the Apis published-reference analysis page."""
 
     _render_scope()
+    if not _render_activation_notice(session):
+        return
     candidates = active_query_annotations(session, user)
     if not candidates:
         st.info(
@@ -167,4 +241,9 @@ def render_published_apis_reference_analysis(session: Session, user: User) -> No
             _render_result(run)
 
 
-__all__ = ["render_published_apis_reference_analysis"]
+__all__ = [
+    "ANALYSIS_ACTIVATION_REQUIREMENTS",
+    "ANALYSIS_NOT_AUTOMATICALLY_ACTIVE_MESSAGE",
+    "analysis_activation_readiness",
+    "render_published_apis_reference_analysis",
+]

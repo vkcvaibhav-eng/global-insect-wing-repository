@@ -31,6 +31,7 @@ from wing_repository.services import (
     submit_annotation,
 )
 from wing_repository.ui.analysis_pages import _lineage_table, _nearest_table, _region_table
+from wing_repository.ui.analysis_pages import analysis_activation_readiness
 
 
 def _base_shape() -> np.ndarray:
@@ -104,6 +105,24 @@ def _published_apis_template(
     db_session.commit()
     db_session.refresh(template)
     return template
+
+
+def test_analysis_activation_readiness_lists_inactive_prerequisites(
+    db_session: Session,
+    administrator: User,
+) -> None:
+    ready, missing = analysis_activation_readiness(db_session)
+
+    assert ready is False
+    assert "publish the Version 2 landmark template" in missing
+    assert "build and activate the models" in missing
+
+    _published_apis_template(db_session, administrator)
+    ready_after_template, missing_after_template = analysis_activation_readiness(db_session)
+
+    assert ready_after_template is False
+    assert "publish the Version 2 landmark template" not in missing_after_template
+    assert missing_after_template == ["build and activate the models"]
 
 
 def _query_annotation(
