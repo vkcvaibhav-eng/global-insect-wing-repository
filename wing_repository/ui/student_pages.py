@@ -54,6 +54,8 @@ CALIBRATION_UNITS = (
     "inches",
 )
 ZOOM_PERCENTAGES = (100, 150, 200, 300, 400)
+SELECTED_DRAFT_KEY = "wbr_selected_annotation_id"
+INSPECT_SUBMISSION_KEY = "wbr_inspect_annotation_id"
 
 
 def _optional_float(value: str, field_name: str) -> float | None:
@@ -322,7 +324,7 @@ def _create_or_open_draft(session: Session, user: User) -> None:
         annotation = create_draft_annotation(
             session, user, wing_image_id=selected_image_id
         )
-        st.session_state["wbr_selected_annotation_id"] = annotation.id
+        st.session_state[SELECTED_DRAFT_KEY] = annotation.id
         st.rerun()
 
 
@@ -505,7 +507,7 @@ def render_digitization(session: Session, user: User) -> None:
     with st.expander("Start another image", expanded=False):
         _create_or_open_draft(session, user)
 
-    selected_id = st.session_state.get("wbr_selected_annotation_id")
+    selected_id = st.session_state.get(SELECTED_DRAFT_KEY)
     default_index = next(
         (index for index, item in enumerate(drafts) if item.id == selected_id), 0
     )
@@ -520,7 +522,7 @@ def render_digitization(session: Session, user: User) -> None:
         key="wbr_draft_selector",
     )
     annotation = drafts_by_id[selected_annotation_id]
-    st.session_state["wbr_selected_annotation_id"] = annotation.id
+    st.session_state[SELECTED_DRAFT_KEY] = annotation.id
 
     _render_scale_calibration(session, user, annotation)
 
@@ -649,7 +651,10 @@ def render_digitization(session: Session, user: User) -> None:
             ),
             width="stretch",
         ):
-            submit_annotation(session, user, annotation_id=annotation.id)
+            submitted = submit_annotation(session, user, annotation_id=annotation.id)
+            st.session_state.pop(SELECTED_DRAFT_KEY, None)
+            st.session_state.pop("wbr_draft_selector", None)
+            st.session_state[INSPECT_SUBMISSION_KEY] = submitted.id
             st.toast("Annotation submitted for expert review.")
             move_to_page("My submissions")
     if (
@@ -698,6 +703,20 @@ def _submission_rows(annotations: list[Annotation]) -> pd.DataFrame:
     )
 
 
+def _preferred_annotation_index(
+    annotations: list[Annotation],
+    preferred_id: object,
+) -> int:
+    return next(
+        (
+            index
+            for index, annotation in enumerate(annotations)
+            if annotation.id == preferred_id
+        ),
+        0,
+    )
+
+
 def render_submissions(session: Session, user: User) -> None:
     st.title("My submissions")
     annotations = list_student_annotations(session, user)
@@ -706,13 +725,20 @@ def render_submissions(session: Session, user: User) -> None:
         return
     st.dataframe(_submission_rows(annotations), width="stretch", hide_index=True)
     annotations_by_id = {annotation.id: annotation for annotation in annotations}
+    preferred_id = st.session_state.get(INSPECT_SUBMISSION_KEY)
+    if preferred_id not in annotations_by_id:
+        st.session_state.pop(INSPECT_SUBMISSION_KEY, None)
+        preferred_id = None
+    default_index = _preferred_annotation_index(annotations, preferred_id)
     selected_annotation_id = st.selectbox(
         "Inspect annotation revision",
         list(annotations_by_id),
+        index=default_index,
         format_func=lambda annotation_id: (
             f"{_annotation_label(annotations_by_id[annotation_id])} · "
             f"{annotations_by_id[annotation_id].status.value}"
         ),
+        key=INSPECT_SUBMISSION_KEY,
     )
     selected = annotations_by_id[selected_annotation_id]
     st.write(
@@ -738,7 +764,7 @@ def render_submissions(session: Session, user: User) -> None:
 
     if selected.status is AnnotationStatus.DRAFT:
         if st.button("Resume this draft", type="primary"):
-            st.session_state["wbr_selected_annotation_id"] = selected.id
+            st.session_state[SELECTED_DRAFT_KEY] = selected.id
             move_to_page("Manual landmark digitization")
     elif selected.status in {AnnotationStatus.RETURNED, AnnotationStatus.WITHDRAWN}:
         if selected.status is AnnotationStatus.RETURNED:
@@ -757,7 +783,7 @@ def render_submissions(session: Session, user: User) -> None:
             revision = clone_preserved_annotation(
                 session, user, annotation_id=selected.id
             )
-            st.session_state["wbr_selected_annotation_id"] = revision.id
+            st.session_state[SELECTED_DRAFT_KEY] = revision.id
             move_to_page("Manual landmark digitization")
         if (
             selected.status is AnnotationStatus.WITHDRAWN
