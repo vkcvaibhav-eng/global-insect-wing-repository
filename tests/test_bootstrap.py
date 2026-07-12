@@ -2,13 +2,19 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from alembic import command
+from alembic.config import Config
 from sqlalchemy import func, select
+from sqlalchemy import inspect, text
 
 from wing_repository.bootstrap import ensure_database_ready
 from wing_repository.config import Settings, get_settings
 from wing_repository.db import build_engine, build_session_factory
 from wing_repository.models import RepositoryRecord, User
 from wing_repository.security import verify_password
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_opt_in_demo_bootstrap_migrates_and_seeds_idempotently(
@@ -50,6 +56,43 @@ def test_opt_in_demo_bootstrap_migrates_and_seeds_idempotently(
                 session.scalar(select(func.count()).select_from(RepositoryRecord))
                 == 1
             )
+    finally:
+        app_engine.dispose()
+        get_settings.cache_clear()
+
+
+def test_existing_alembic_database_is_upgraded_on_startup(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    database_path = tmp_path / "existing.sqlite3"
+    database_url = f"sqlite:///{database_path.as_posix()}"
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    get_settings.cache_clear()
+    config = Config(str(PROJECT_ROOT / "alembic.ini"))
+    command.upgrade(config, "0001_initial")
+    app_engine = build_engine(database_url)
+    factory = build_session_factory(app_engine)
+
+    try:
+        with app_engine.connect() as connection:
+            assert connection.scalar(
+                text("SELECT version_num FROM alembic_version")
+            ) == "0001_initial"
+
+        assert ensure_database_ready(
+            app_engine=app_engine,
+            session_factory=factory,
+            settings=get_settings(),
+        )
+
+        with app_engine.connect() as connection:
+            assert connection.scalar(
+                text("SELECT version_num FROM alembic_version")
+            ) == "0002_image_calibration"
+        assert "scale_mm_per_pixel" in {
+            column["name"] for column in inspect(app_engine).get_columns("wing_images")
+        }
     finally:
         app_engine.dispose()
         get_settings.cache_clear()

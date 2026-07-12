@@ -138,9 +138,11 @@ alembic upgrade head
 streamlit run app.py
 ```
 
-For the first empty hosted demo, `WBR_AUTO_BOOTSTRAP_DEMO = "true"` can apply
-migrations and seed synthetic users on startup. After confirming the app starts,
-set it back to `"false"` so future startup does not perform demo provisioning.
+When an existing database was created through Alembic, the app applies pending
+schema migrations on startup. For the first empty hosted demo,
+`WBR_AUTO_BOOTSTRAP_DEMO = "true"` can also seed synthetic users on startup.
+After confirming the app starts, set it back to `"false"` so future startup
+does not perform demo provisioning.
 If the demo accounts were seeded with the wrong passwords, temporarily set
 `WBR_DEMO_RESET_PASSWORDS = "true"` together with
 `WBR_AUTO_BOOTSTRAP_DEMO = "true"`, reboot once, confirm login, then set both

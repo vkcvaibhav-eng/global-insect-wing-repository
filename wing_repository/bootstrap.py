@@ -19,6 +19,17 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _bootstrap_lock = Lock()
 
 
+def _alembic_config() -> Config:
+    return Config(str(PROJECT_ROOT / "alembic.ini"))
+
+
+def _upgrade_existing_alembic_schema(app_engine: Engine) -> None:
+    """Apply pending migrations for an already Alembic-managed database."""
+
+    if inspect(app_engine).has_table("alembic_version"):
+        command.upgrade(_alembic_config(), "head")
+
+
 def _prepare_demo_storage(settings: Settings) -> None:
     """Create writable local directories before the first SQLite connection."""
 
@@ -49,10 +60,9 @@ def ensure_database_ready(
     if active_settings.auto_bootstrap_demo:
         _prepare_demo_storage(active_settings)
     if inspect(app_engine).has_table("users"):
-        if active_settings.auto_bootstrap_demo and active_settings.demo_reset_passwords:
-            with _bootstrap_lock:
-                alembic_config = Config(str(PROJECT_ROOT / "alembic.ini"))
-                command.upgrade(alembic_config, "head")
+        with _bootstrap_lock:
+            _upgrade_existing_alembic_schema(app_engine)
+            if active_settings.auto_bootstrap_demo and active_settings.demo_reset_passwords:
                 from scripts.seed_demo import seed_demo_accounts
 
                 with session_factory() as session:
@@ -60,10 +70,6 @@ def ensure_database_ready(
                         session,
                         reset_passwords=active_settings.demo_reset_passwords,
                     )
-        elif active_settings.auto_bootstrap_demo:
-            with _bootstrap_lock:
-                alembic_config = Config(str(PROJECT_ROOT / "alembic.ini"))
-                command.upgrade(alembic_config, "head")
         return True
     if not active_settings.auto_bootstrap_demo:
         return False
@@ -71,8 +77,7 @@ def ensure_database_ready(
     with _bootstrap_lock:
         if inspect(app_engine).has_table("users"):
             return True
-        alembic_config = Config(str(PROJECT_ROOT / "alembic.ini"))
-        command.upgrade(alembic_config, "head")
+        command.upgrade(_alembic_config(), "head")
 
         # Import lazily so ordinary production startup does not depend on the
         # repository maintenance command package.
