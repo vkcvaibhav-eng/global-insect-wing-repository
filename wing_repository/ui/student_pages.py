@@ -433,6 +433,7 @@ def _render_scale_calibration(
             int(calibration_zoom),
         ),
         allow_upscale=True,
+        marker_style="scale_endpoint",
     )
     event = streamlit_image_coordinates(
         calibration_overlay,
