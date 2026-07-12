@@ -21,6 +21,12 @@ from wing_repository.template_loader import (
 SAMPLE_TEMPLATE = (
     Path(__file__).resolve().parents[1] / "demo_data" / "templates" / "apis_v1.json"
 )
+APIS_STANDARD_TEMPLATE = (
+    Path(__file__).resolve().parents[1]
+    / "demo_data"
+    / "templates"
+    / "apis_standard_19_v2.json"
+)
 
 
 @pytest.fixture
@@ -40,6 +46,21 @@ def test_sample_template_loads_with_exact_version_and_ordered_landmarks() -> Non
     assert definition.wing_side is WingSide.RIGHT
     assert definition.wing_type is WingType.FOREWING
     assert [item.ordinal for item in definition.landmarks] == list(range(1, 11))
+    assert definition.reference_image is None
+
+
+def test_apis_standard_template_declares_reference_image() -> None:
+    definition = load_template_definition(APIS_STANDARD_TEMPLATE)
+
+    assert definition.version == 2
+    assert len(definition.landmarks) == 19
+    assert definition.reference_image is not None
+    assert (
+        definition.reference_image.uri
+        == "demo_data/reference_guides/apis_standard_19_v2_landmark_guide.png"
+    )
+    assert definition.reference_image.caption is not None
+    assert "visual placement reference" in definition.reference_image.caption
 
 
 @pytest.mark.parametrize(
@@ -88,6 +109,16 @@ def test_template_parser_rejects_case_insensitive_duplicate_labels(
     landmarks[1]["label"] = str(landmarks[0]["label"]).lower()
 
     with pytest.raises(ValidationError, match="Duplicate"):
+        parse_template_definition(document)
+
+
+def test_template_parser_rejects_unsafe_reference_image_path(
+    sample_document: dict[str, object],
+) -> None:
+    document = deepcopy(sample_document)
+    document["reference_image"] = {"uri": "../private/guide.png"}
+
+    with pytest.raises(ValidationError, match="reference_image.uri"):
         parse_template_definition(document)
 
 

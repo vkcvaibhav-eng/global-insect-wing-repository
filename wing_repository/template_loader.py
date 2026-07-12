@@ -31,6 +31,13 @@ class TemplateLandmarkDefinition:
 
 
 @dataclass(frozen=True, slots=True)
+class TemplateReferenceImageDefinition:
+    uri: str
+    caption: str | None
+    citation: str | None
+
+
+@dataclass(frozen=True, slots=True)
 class TemplateDefinition:
     schema_version: str
     order: str
@@ -43,6 +50,7 @@ class TemplateDefinition:
     wing_side: WingSide
     wing_type: WingType
     description: str | None
+    reference_image: TemplateReferenceImageDefinition | None
     landmarks: tuple[TemplateLandmarkDefinition, ...]
 
 
@@ -71,6 +79,61 @@ def _enum_value(enum_type: type[Any], value: object, key: str) -> Any:
     except ValueError as exc:
         allowed = ", ".join(item.value for item in enum_type)
         raise ValidationError(f"Template field {key!r} must be one of: {allowed}.") from exc
+
+
+def _optional_nested_text(
+    document: Mapping[str, Any],
+    parent_key: str,
+    key: str,
+) -> str | None:
+    value = document.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValidationError(
+            f"Template field {parent_key!r}.{key!r} must be text or null."
+        )
+    normalized = value.strip()
+    return normalized or None
+
+
+def _validate_reference_image_uri(uri: str) -> str:
+    if "://" in uri:
+        if not uri.startswith(("https://", "http://")):
+            raise ValidationError(
+                "reference_image.uri must be an HTTP(S) URL or a repository-relative path."
+            )
+        return uri
+    if uri.startswith(("/", "\\", "~")) or ":" in uri:
+        raise ValidationError(
+            "reference_image.uri repository paths must be relative, not absolute."
+        )
+    parts = uri.replace("\\", "/").split("/")
+    if any(part in {"", ".", ".."} for part in parts):
+        raise ValidationError(
+            "reference_image.uri repository paths must not contain empty or parent segments."
+        )
+    return "/".join(parts)
+
+
+def _optional_reference_image(
+    document: Mapping[str, Any],
+) -> TemplateReferenceImageDefinition | None:
+    raw_reference_image = document.get("reference_image")
+    if raw_reference_image is None:
+        return None
+    if not isinstance(raw_reference_image, Mapping):
+        raise ValidationError("Template field 'reference_image' must be an object.")
+    raw_uri = raw_reference_image.get("uri")
+    if not isinstance(raw_uri, str) or not raw_uri.strip():
+        raise ValidationError(
+            "Template field 'reference_image'.'uri' must be non-empty text."
+        )
+    return TemplateReferenceImageDefinition(
+        uri=_validate_reference_image_uri(raw_uri.strip()),
+        caption=_optional_nested_text(raw_reference_image, "reference_image", "caption"),
+        citation=_optional_nested_text(raw_reference_image, "reference_image", "citation"),
+    )
 
 
 def parse_template_definition(document: Mapping[str, Any]) -> TemplateDefinition:
@@ -134,6 +197,7 @@ def parse_template_definition(document: Mapping[str, Any]) -> TemplateDefinition
         wing_side=wing_side,
         wing_type=wing_type,
         description=_optional_text(document, "description"),
+        reference_image=_optional_reference_image(document),
         landmarks=tuple(landmarks),
     )
 
@@ -168,6 +232,15 @@ def _canonical_source(definition: TemplateDefinition) -> str:
         "wing_side": definition.wing_side.value.upper(),
         "wing_type": definition.wing_type.value.upper(),
         "description": definition.description,
+        "reference_image": (
+            {
+                "uri": definition.reference_image.uri,
+                "caption": definition.reference_image.caption,
+                "citation": definition.reference_image.citation,
+            }
+            if definition.reference_image is not None
+            else None
+        ),
         "landmarks": [
             {
                 "ordinal": landmark.ordinal,

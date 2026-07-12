@@ -173,9 +173,16 @@ The published-reference analysis module uses a separate draft template at
 - right forewing only
 - 19 fixed landmarks
 - initial status `draft`
+- optional visual guide image:
+  `demo_data/reference_guides/apis_standard_19_v2_landmark_guide.png`
 
 Do not edit or delete the v1 teaching template. The v2 template must be
 reviewed and explicitly published before analysis models can be activated.
+The guide image is displayed only to help human landmark placement; the app
+does not extract coordinates from it, does not save its pixels with specimen
+records, and does not mix it with uploaded-wing coordinates. Replace the
+bundled user-provided guide with a licensed and cited image before production
+publication if its reuse rights are uncertain.
 
 ## Published Apis Reference Analysis
 
@@ -238,8 +245,10 @@ See:
 The current digitizer supports per-image scale calibration, selectable display
 zoom, numbered sequential placement, immediate coordinate persistence,
 undo-last, explicit deletion/replacement, and a server-rendered landmark
-overlay. Every click is mapped from the component's actual rendered dimensions
-to the stored original raster dimensions. Pixel and normalized coordinates are
+overlay. Templates may also declare an optional visual reference guide image,
+which is shown beside the uploaded specimen image when available. Every click
+is mapped from the component's actual rendered dimensions to the stored
+original specimen-raster dimensions. Pixel and normalized coordinates are
 preserved; calibrated millimeter coordinates are derived when a saved image
 scale is available.
 
@@ -323,6 +332,7 @@ app.py                         Streamlit entry point
 wing_repository/               Models, services, and UI
 alembic/                       Versioned database migrations
 demo_data/templates/           Sample versioned template JSON
+demo_data/reference_guides/    Optional visual-only landmark guide images
 scripts/seed_demo.py           Idempotent synthetic demo seed
 docs/ARCHITECTURE.md           Boundaries and data-integrity design
 docs/ASSUMPTIONS.md            Explicit Version 0.1 assumptions

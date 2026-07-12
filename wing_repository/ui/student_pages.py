@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 import math
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
@@ -36,6 +37,10 @@ from wing_repository.services import (
     submit_annotation,
     undo_last_point,
     withdraw_submitted_annotation,
+)
+from wing_repository.template_reference import (
+    TemplateReferenceGuide,
+    template_reference_guide,
 )
 from wing_repository.ui.common import (
     annotation_dataframe,
@@ -333,6 +338,41 @@ def _display_width_for_zoom(source_width: int, zoom_percent: int) -> int:
     return max(100, min(3200, round(base_width * zoom_percent / 100)))
 
 
+def _render_template_reference_guide(guide: TemplateReferenceGuide) -> None:
+    st.subheader("Template landmark guide")
+    if guide.warning:
+        st.info(guide.warning)
+    source = guide.source
+    if not source.startswith(("https://", "http://")) and not Path(source).exists():
+        st.warning(
+            "This template declares a reference image, but the file is not "
+            "available in this deployment."
+        )
+        st.code(source)
+        return
+    st.image(source, caption=guide.caption, width="stretch")
+    if guide.citation:
+        st.caption(guide.citation)
+
+
+def _render_annotation_digitizer(annotation: Annotation, zoom_percent: int):
+    st.subheader("Uploaded specimen image")
+    st.caption("Click on this image only. These clicks become the saved coordinates.")
+    overlay = annotation_overlay(
+        annotation,
+        max_display_width=_display_width_for_zoom(
+            annotation.image_width,
+            int(zoom_percent),
+        ),
+        allow_upscale=True,
+    )
+    return streamlit_image_coordinates(
+        overlay,
+        width=overlay.width,
+        key=f"digitizer_{annotation.id}",
+    )
+
+
 def _calibration_points_key(wing_image_id: int) -> str:
     return f"wbr_scale_points_{wing_image_id}"
 
@@ -561,19 +601,15 @@ def render_digitization(session: Session, user: User) -> None:
         "Higher zoom displays a larger image while clicks are still saved in "
         "the original image pixel coordinate system."
     )
-    overlay = annotation_overlay(
-        annotation,
-        max_display_width=_display_width_for_zoom(
-            annotation.image_width,
-            int(zoom_percent),
-        ),
-        allow_upscale=True,
-    )
-    event = streamlit_image_coordinates(
-        overlay,
-        width=overlay.width,
-        key=f"digitizer_{annotation.id}",
-    )
+    guide = template_reference_guide(annotation.template)
+    if guide is None:
+        event = _render_annotation_digitizer(annotation, int(zoom_percent))
+    else:
+        guide_column, digitizer_column = st.columns((1, 2))
+        with guide_column:
+            _render_template_reference_guide(guide)
+        with digitizer_column:
+            event = _render_annotation_digitizer(annotation, int(zoom_percent))
     if event is not None:
         token = click_event_token(event)
         token_key = f"wbr_last_click_{annotation.id}"
