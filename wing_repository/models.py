@@ -34,6 +34,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from wing_repository.db import Base
 from wing_repository.enums import (
     AnnotationStatus,
+    AnalysisModelStatus,
+    AnalysisOutlierStatus,
+    AnalysisQualityStatus,
+    AnalysisRunStatus,
+    AnalysisType,
     ReviewDecision,
     Role,
     TemplateStatus,
@@ -232,6 +237,12 @@ class LandmarkTemplate(Base):
         back_populates="template", passive_deletes=True
     )
     annotations: Mapped[list[Annotation]] = relationship(
+        back_populates="template", passive_deletes=True
+    )
+    external_reference_datasets: Mapped[list[ExternalReferenceDataset]] = relationship(
+        back_populates="template", passive_deletes=True
+    )
+    analysis_models: Mapped[list[AnalysisModel]] = relationship(
         back_populates="template", passive_deletes=True
     )
 
@@ -521,6 +532,9 @@ class Annotation(Base):
     repository_record: Mapped[RepositoryRecord | None] = relationship(
         back_populates="annotation", passive_deletes=True, uselist=False
     )
+    analysis_runs: Mapped[list[WingAnalysisRun]] = relationship(
+        back_populates="query_annotation", passive_deletes=True
+    )
 
 
 class AnnotationPoint(Base):
@@ -633,18 +647,392 @@ class RepositoryRecord(Base):
     taxon: Mapped[Taxon] = relationship(back_populates="repository_records")
 
 
+class ExternalReferenceDataset(Base):
+    """A published external dataset used only as reproducible reference data."""
+
+    __tablename__ = "external_reference_datasets"
+    __table_args__ = (
+        UniqueConstraint("dataset_code", name="uq_external_datasets_code"),
+        CheckConstraint("length(trim(dataset_code)) >= 1", name="dataset_code_nonempty"),
+        CheckConstraint("length(trim(title)) >= 1", name="dataset_title_nonempty"),
+        CheckConstraint("length(trim(authors)) >= 1", name="dataset_authors_nonempty"),
+        CheckConstraint("publication_year >= 1800", name="publication_year_plausible"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    dataset_code: Mapped[str] = mapped_column(String(80), nullable=False)
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    authors: Mapped[str] = mapped_column(Text, nullable=False)
+    publication_year: Mapped[int] = mapped_column(Integer, nullable=False)
+    dataset_doi: Mapped[str] = mapped_column(String(120), nullable=False)
+    article_doi: Mapped[str | None] = mapped_column(String(120))
+    workflow_doi: Mapped[str | None] = mapped_column(String(120))
+    version: Mapped[str | None] = mapped_column(String(80))
+    licence: Mapped[str | None] = mapped_column(String(200))
+    taxonomic_scope: Mapped[str] = mapped_column(String(200), nullable=False)
+    geographic_scope: Mapped[str | None] = mapped_column(String(200))
+    template_id: Mapped[int] = mapped_column(
+        ForeignKey("landmark_templates.id", ondelete="RESTRICT"), nullable=False
+    )
+    manifest_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now, server_default=func.now()
+    )
+
+    template: Mapped[LandmarkTemplate] = relationship(
+        back_populates="external_reference_datasets"
+    )
+    shapes: Mapped[list[ExternalReferenceShape]] = relationship(
+        back_populates="external_dataset", passive_deletes=True
+    )
+    import_issues: Mapped[list[ExternalReferenceImportIssue]] = relationship(
+        back_populates="external_dataset", passive_deletes=True
+    )
+
+
+class ExternalReferenceShape(Base):
+    """One published coordinate configuration, not a native WBR specimen."""
+
+    __tablename__ = "external_reference_shapes"
+    __table_args__ = (
+        UniqueConstraint(
+            "external_dataset_id",
+            "source_record_identifier",
+            name="uq_external_shapes_dataset_record",
+        ),
+        UniqueConstraint(
+            "external_dataset_id",
+            "source_row_hash",
+            name="uq_external_shapes_dataset_row_hash",
+        ),
+        CheckConstraint(
+            "length(trim(source_record_identifier)) >= 1",
+            name="external_record_identifier_nonempty",
+        ),
+        CheckConstraint("coordinate_count = 19", name="external_shape_19_coordinates"),
+        CheckConstraint("wing_type = 'forewing'", name="external_shape_forewing_only"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    external_dataset_id: Mapped[int] = mapped_column(
+        ForeignKey("external_reference_datasets.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    source_record_identifier: Mapped[str] = mapped_column(String(255), nullable=False)
+    source_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    source_sample_identifier: Mapped[str | None] = mapped_column(String(255))
+    taxon_name: Mapped[str] = mapped_column(
+        String(200), nullable=False, default="Apis mellifera", server_default="Apis mellifera"
+    )
+    country_code: Mapped[str | None] = mapped_column(String(16), index=True)
+    published_region: Mapped[str | None] = mapped_column(String(120), index=True)
+    published_lineage: Mapped[str | None] = mapped_column(String(16), index=True)
+    wing_type: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="forewing", server_default="forewing"
+    )
+    original_side: Mapped[str | None] = mapped_column(String(40))
+    coordinate_json: Mapped[str] = mapped_column(Text, nullable=False)
+    analytical_coordinate_json: Mapped[str | None] = mapped_column(Text)
+    coordinate_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    source_metadata_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    source_row_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    imported_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now, server_default=func.now()
+    )
+
+    external_dataset: Mapped[ExternalReferenceDataset] = relationship(
+        back_populates="shapes"
+    )
+    published_shape_matches: Mapped[list[PublishedShapeMatch]] = relationship(
+        back_populates="external_reference_shape", passive_deletes=True
+    )
+
+
+class ExternalReferenceImportIssue(Base):
+    """A quarantined source row that failed import validation."""
+
+    __tablename__ = "external_reference_import_issues"
+    __table_args__ = (
+        UniqueConstraint(
+            "external_dataset_id",
+            "source_row_hash",
+            name="uq_external_import_issues_dataset_row_hash",
+        ),
+        CheckConstraint("length(trim(reason)) >= 1", name="import_issue_reason_nonempty"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    external_dataset_id: Mapped[int] = mapped_column(
+        ForeignKey("external_reference_datasets.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    source_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    source_row_identifier: Mapped[str | None] = mapped_column(String(255))
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    raw_json: Mapped[str] = mapped_column(Text, nullable=False)
+    source_row_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    quarantined_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now, server_default=func.now()
+    )
+
+    external_dataset: Mapped[ExternalReferenceDataset] = relationship(
+        back_populates="import_issues"
+    )
+
+
+class AnalysisModel(Base):
+    """A versioned, reproducible morphometric model artifact."""
+
+    __tablename__ = "analysis_models"
+    __table_args__ = (
+        UniqueConstraint(
+            "model_code", "model_version", name="uq_analysis_models_code_version"
+        ),
+        CheckConstraint("model_version >= 1", name="analysis_model_version_positive"),
+        CheckConstraint(
+            "reference_wing_count >= 0", name="analysis_model_wing_count_nonnegative"
+        ),
+        CheckConstraint(
+            "reference_sample_count >= 0", name="analysis_model_sample_count_nonnegative"
+        ),
+        CheckConstraint(
+            "artifact_sha256 IS NULL OR length(artifact_sha256) = 64",
+            name="analysis_model_artifact_sha256_length",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    model_code: Mapped[str] = mapped_column(String(120), nullable=False)
+    model_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    template_id: Mapped[int] = mapped_column(
+        ForeignKey("landmark_templates.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    analysis_type: Mapped[AnalysisType] = mapped_column(
+        enum_column_type(AnalysisType, name="analysis_type_enum", length=40),
+        nullable=False,
+        index=True,
+    )
+    source_dataset_ids: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    reference_wing_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    reference_sample_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    preprocessing_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    software_versions_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    source_hashes_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    validation_metrics_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    artifact_storage_key: Mapped[str | None] = mapped_column(String(500))
+    artifact_sha256: Mapped[str | None] = mapped_column(String(64))
+    model_status: Mapped[AnalysisModelStatus] = mapped_column(
+        enum_column_type(AnalysisModelStatus, name="analysis_model_status_enum", length=24),
+        nullable=False,
+        default=AnalysisModelStatus.BUILDING,
+        server_default=AnalysisModelStatus.BUILDING.value,
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now, server_default=func.now()
+    )
+    activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    template: Mapped[LandmarkTemplate] = relationship(back_populates="analysis_models")
+    analysis_runs: Mapped[list[WingAnalysisRun]] = relationship(
+        back_populates="model", passive_deletes=True
+    )
+
+
+class WingAnalysisRun(Base):
+    """A persisted query result tied to one exact model version."""
+
+    __tablename__ = "wing_analysis_runs"
+    __table_args__ = (
+        CheckConstraint(
+            "analysis_scope = 'single_wing'", name="analysis_scope_single_wing_only"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    query_annotation_id: Mapped[int] = mapped_column(
+        ForeignKey("annotations.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    model_id: Mapped[int] = mapped_column(
+        ForeignKey("analysis_models.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    analysis_scope: Mapped[str] = mapped_column(
+        String(40), nullable=False, default="single_wing", server_default="single_wing"
+    )
+    status: Mapped[AnalysisRunStatus] = mapped_column(
+        enum_column_type(AnalysisRunStatus, name="analysis_run_status_enum", length=16),
+        nullable=False,
+        default=AnalysisRunStatus.RUNNING,
+        server_default=AnalysisRunStatus.RUNNING.value,
+        index=True,
+    )
+    preliminary_single_wing: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=true()
+    )
+    quality_status: Mapped[AnalysisQualityStatus] = mapped_column(
+        enum_column_type(AnalysisQualityStatus, name="analysis_quality_status_enum", length=16),
+        nullable=False,
+        default=AnalysisQualityStatus.PASS,
+        server_default=AnalysisQualityStatus.PASS.value,
+    )
+    outlier_status: Mapped[AnalysisOutlierStatus] = mapped_column(
+        enum_column_type(AnalysisOutlierStatus, name="analysis_outlier_status_enum", length=40),
+        nullable=False,
+        default=AnalysisOutlierStatus.IN_DISTRIBUTION,
+        server_default=AnalysisOutlierStatus.IN_DISTRIBUTION.value,
+    )
+    warning_text: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now, server_default=func.now()
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    query_annotation: Mapped[Annotation] = relationship(back_populates="analysis_runs")
+    model: Mapped[AnalysisModel] = relationship(back_populates="analysis_runs")
+    region_probabilities: Mapped[list[RegionProbability]] = relationship(
+        back_populates="analysis_run", passive_deletes=True
+    )
+    lineage_probabilities: Mapped[list[LineageProbability]] = relationship(
+        back_populates="analysis_run", passive_deletes=True
+    )
+    published_shape_matches: Mapped[list[PublishedShapeMatch]] = relationship(
+        back_populates="analysis_run", passive_deletes=True
+    )
+
+
+class RegionProbability(Base):
+    """One ranked geographical reference-group affinity result."""
+
+    __tablename__ = "region_probabilities"
+    __table_args__ = (
+        UniqueConstraint("analysis_run_id", "rank", name="uq_region_prob_run_rank"),
+        CheckConstraint("rank >= 1", name="region_probability_rank_positive"),
+        CheckConstraint(
+            "probability >= 0 AND probability <= 1",
+            name="region_probability_range",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    analysis_run_id: Mapped[int] = mapped_column(
+        ForeignKey("wing_analysis_runs.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    rank: Mapped[int] = mapped_column(Integer, nullable=False)
+    reference_group: Mapped[str] = mapped_column(String(120), nullable=False)
+    probability: Mapped[float] = mapped_column(Float, nullable=False)
+    reference_sample_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    interpretation: Mapped[str] = mapped_column(String(200), nullable=False)
+
+    analysis_run: Mapped[WingAnalysisRun] = relationship(
+        back_populates="region_probabilities"
+    )
+
+
+class LineageProbability(Base):
+    """One ranked A/C/M/O wing-shape lineage-affinity result."""
+
+    __tablename__ = "lineage_probabilities"
+    __table_args__ = (
+        UniqueConstraint("analysis_run_id", "rank", name="uq_lineage_prob_run_rank"),
+        UniqueConstraint(
+            "analysis_run_id", "lineage_code", name="uq_lineage_prob_run_lineage"
+        ),
+        CheckConstraint("rank >= 1", name="lineage_probability_rank_positive"),
+        CheckConstraint("lineage_code IN ('A', 'C', 'M', 'O')", name="lineage_code_acmo"),
+        CheckConstraint(
+            "probability >= 0 AND probability <= 1",
+            name="lineage_probability_range",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    analysis_run_id: Mapped[int] = mapped_column(
+        ForeignKey("wing_analysis_runs.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    rank: Mapped[int] = mapped_column(Integer, nullable=False)
+    lineage_code: Mapped[str] = mapped_column(String(1), nullable=False)
+    probability: Mapped[float] = mapped_column(Float, nullable=False)
+    reference_sample_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    interpretation: Mapped[str] = mapped_column(String(200), nullable=False)
+
+    analysis_run: Mapped[WingAnalysisRun] = relationship(
+        back_populates="lineage_probabilities"
+    )
+
+
+class PublishedShapeMatch(Base):
+    """Nearest external published forewing-coordinate configuration."""
+
+    __tablename__ = "published_shape_matches"
+    __table_args__ = (
+        UniqueConstraint(
+            "analysis_run_id", "rank", name="uq_published_shape_match_run_rank"
+        ),
+        CheckConstraint("rank >= 1", name="published_shape_match_rank_positive"),
+        CheckConstraint(
+            "procrustes_distance >= 0", name="published_shape_distance_nonnegative"
+        ),
+        CheckConstraint(
+            "similarity_percentile >= 0 AND similarity_percentile <= 100",
+            name="published_shape_similarity_percentile_range",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    analysis_run_id: Mapped[int] = mapped_column(
+        ForeignKey("wing_analysis_runs.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    rank: Mapped[int] = mapped_column(Integer, nullable=False)
+    external_reference_shape_id: Mapped[int] = mapped_column(
+        ForeignKey("external_reference_shapes.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    procrustes_distance: Mapped[float] = mapped_column(Float, nullable=False)
+    similarity_percentile: Mapped[float] = mapped_column(Float, nullable=False)
+
+    analysis_run: Mapped[WingAnalysisRun] = relationship(
+        back_populates="published_shape_matches"
+    )
+    external_reference_shape: Mapped[ExternalReferenceShape] = relationship(
+        back_populates="published_shape_matches"
+    )
+
+
 __all__ = [
     "Annotation",
     "AnnotationPoint",
+    "AnalysisModel",
     "Assignment",
     "Base",
+    "ExternalReferenceDataset",
+    "ExternalReferenceImportIssue",
+    "ExternalReferenceShape",
     "LandmarkTemplate",
+    "LineageProbability",
+    "PublishedShapeMatch",
     "RepositoryRecord",
+    "RegionProbability",
     "Review",
     "Specimen",
     "Taxon",
     "TemplateLandmark",
     "User",
+    "WingAnalysisRun",
     "WingImage",
     "utc_now",
 ]

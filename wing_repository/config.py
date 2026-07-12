@@ -57,6 +57,10 @@ class Settings:
     r2_access_key_id: str | None = None
     r2_secret_access_key: str | None = None
     r2_key_prefix: str = "originals/"
+    oleksa_reference_dir: Path | None = None
+    nawrocka_reference_dir: Path | None = None
+    apis_workflow_dir: Path | None = None
+    analysis_artifact_dir: Path = DEFAULT_DATA_DIR / "analysis-artifacts"
 
     @property
     def original_image_dir(self) -> Path:
@@ -111,6 +115,21 @@ class Settings:
             r2_access_key_id=os.getenv("WBR_R2_ACCESS_KEY_ID"),
             r2_secret_access_key=os.getenv("WBR_R2_SECRET_ACCESS_KEY"),
             r2_key_prefix=os.getenv("WBR_R2_KEY_PREFIX", "originals/"),
+            oleksa_reference_dir=(
+                Path(value) if (value := os.getenv("WBR_OLEKSA_REFERENCE_DIR")) else None
+            ),
+            nawrocka_reference_dir=(
+                Path(value) if (value := os.getenv("WBR_NAWROCKA_REFERENCE_DIR")) else None
+            ),
+            apis_workflow_dir=(
+                Path(value) if (value := os.getenv("WBR_APIS_WORKFLOW_DIR")) else None
+            ),
+            analysis_artifact_dir=Path(
+                os.getenv(
+                    "WBR_ANALYSIS_ARTIFACT_DIR",
+                    str(DEFAULT_DATA_DIR / "analysis-artifacts"),
+                )
+            ),
         )
 
 

@@ -165,6 +165,64 @@ side/type, point count, ordinal sequence, labels, and descriptions. Once a
 template is used by an annotation it is treated as immutable; corrections are
 new template versions.
 
+The published-reference analysis module uses a separate draft template at
+`demo_data/templates/apis_standard_19_v2.json`:
+
+- `Apis right forewing standard 19-landmark template`
+- version `2`
+- right forewing only
+- 19 fixed landmarks
+- initial status `draft`
+
+Do not edit or delete the v1 teaching template. The v2 template must be
+reviewed and explicitly published before analysis models can be activated.
+
+## Published Apis Reference Analysis
+
+The optional `Published Apis Reference Analysis` page is restricted to
+preliminary single-wing **Apis mellifera** worker right-forewing shape analysis.
+It is not species identification and does not make molecular/genomic lineage
+claims. Hindwings are not supported.
+
+External reference records are stored separately from native repository
+specimens and never receive `WBR-HYM-*` accessions. The module expects local
+copies of the published datasets; it does not download research data during
+Streamlit startup.
+
+Configure local source directories and an artifact directory:
+
+```powershell
+$env:WBR_OLEKSA_REFERENCE_DIR = "C:\reference-data\oleksa-zenodo-7244070"
+$env:WBR_NAWROCKA_REFERENCE_DIR = "C:\reference-data\nawrocka-zenodo-7567336"
+$env:WBR_APIS_WORKFLOW_DIR = "C:\reference-data\workflowhub-422"
+$env:WBR_ANALYSIS_ARTIFACT_DIR = "data\analysis-artifacts"
+```
+
+Inspect and import:
+
+```powershell
+python -m wing_repository.reference_data inspect-oleksa
+python -m wing_repository.reference_data import-oleksa
+python -m wing_repository.reference_data inspect-nawrocka
+python -m wing_repository.reference_data import-nawrocka
+python -m wing_repository.reference_data validate-import
+```
+
+Build and activate models after the v2 template has been reviewed/published:
+
+```powershell
+python -m wing_repository.reference_data ensure-apis-template
+python -m wing_repository.reference_data build-analysis-models --model-version 1
+python -m wing_repository.reference_data activate-models --model-version 1
+```
+
+See:
+
+- `docs/PUBLISHED_APIS_REFERENCE_ANALYSIS.md`
+- `docs/EXTERNAL_REFERENCE_DATA.md`
+- `docs/MORPHOMETRIC_METHODS.md`
+- `docs/MODEL_VALIDATION.md`
+
 ## Digitizer capabilities and boundary
 
 The current digitizer supports per-image scale calibration, selectable display
@@ -195,6 +253,10 @@ transform safeguards are documented in `docs/ARCHITECTURE.md`.
 | `WBR_R2_ACCESS_KEY_ID` | R2 access key ID | none |
 | `WBR_R2_SECRET_ACCESS_KEY` | R2 secret access key | none |
 | `WBR_R2_KEY_PREFIX` | Prefix for newly uploaded R2 objects | `originals/` |
+| `WBR_OLEKSA_REFERENCE_DIR` | Local Oleksa/Zenodo 7244070 source directory | none |
+| `WBR_NAWROCKA_REFERENCE_DIR` | Local Nawrocka/Zenodo 7567336 source directory | none |
+| `WBR_APIS_WORKFLOW_DIR` | Local WorkflowHub 422 workflow directory | none |
+| `WBR_ANALYSIS_ARTIFACT_DIR` | Versioned model artifact directory | `data/analysis-artifacts` |
 | `WBR_DEMO_ADMIN_PASSWORD` | Seed-only administrator password | none |
 | `WBR_DEMO_STUDENT_PASSWORD` | Seed-only student password | none |
 | `WBR_DEMO_REVIEWER_PASSWORD` | Seed-only reviewer password | none |

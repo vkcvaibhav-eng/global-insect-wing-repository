@@ -44,3 +44,34 @@ class AnnotationStatus(StringEnum):
 class ReviewDecision(StringEnum):
     APPROVE = "approve"
     RETURN = "return"
+
+
+class AnalysisType(StringEnum):
+    APIS_MELLIFERA_EU_REGION = "apis_mellifera_eu_region"
+    APIS_MELLIFERA_LINEAGE = "apis_mellifera_lineage"
+    APIS_MELLIFERA_NEAREST_SHAPE = "apis_mellifera_nearest_shape"
+
+
+class AnalysisModelStatus(StringEnum):
+    BUILDING = "building"
+    VALIDATION_FAILED = "validation_failed"
+    VALIDATED = "validated"
+    ACTIVE = "active"
+    RETIRED = "retired"
+
+
+class AnalysisRunStatus(StringEnum):
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class AnalysisQualityStatus(StringEnum):
+    PASS = "pass"
+    WARNING = "warning"
+    FAIL = "fail"
+
+
+class AnalysisOutlierStatus(StringEnum):
+    IN_DISTRIBUTION = "in_distribution"
+    OUTSIDE_REFERENCE_DISTRIBUTION = "outside_reference_distribution"

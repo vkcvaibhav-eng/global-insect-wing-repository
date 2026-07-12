@@ -129,6 +129,7 @@ def _active_user(session: Session) -> User | None:
 def _page_map(role: Role) -> dict[str, PageRenderer]:
     # Imports are delayed until after the schema/login checks so a configuration
     # error can be shown cleanly instead of failing at module import time.
+    from wing_repository.ui.analysis_pages import render_published_apis_reference_analysis
     from wing_repository.ui.admin_pages import render_administration
     from wing_repository.ui.repository_pages import (
         render_export,
@@ -150,18 +151,21 @@ def _page_map(role: Role) -> dict[str, PageRenderer]:
             "Wing-image upload": render_upload,
             "Manual landmark digitization": render_digitization,
             "My submissions": render_submissions,
+            "Published Apis Reference Analysis": render_published_apis_reference_analysis,
             "Repository browser": render_repository_browser,
             "TPS and CSV export": render_export,
         }
     if role is Role.EXPERT_REVIEWER:
         return {
             "Expert review": render_expert_review,
+            "Published Apis Reference Analysis": render_published_apis_reference_analysis,
             "Repository browser": render_repository_browser,
             "TPS and CSV export": render_export,
         }
     return {
         "Administration": render_administration,
         "Expert review": render_expert_review,
+        "Published Apis Reference Analysis": render_published_apis_reference_analysis,
         "Repository browser": render_repository_browser,
         "TPS and CSV export": render_export,
     }

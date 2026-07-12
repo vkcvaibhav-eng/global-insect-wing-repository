@@ -1,0 +1,110 @@
+{
+  "schema_version": "1.0",
+  "order": "Hymenoptera",
+  "family": "Apidae",
+  "genus": "Apis",
+  "genus_code": "APIS",
+  "template_name": "Apis right forewing standard 19-landmark template",
+  "version": 2,
+  "status": "draft",
+  "wing_side": "RIGHT",
+  "wing_type": "FOREWING",
+  "description": "Draft research template for Apis mellifera worker right forewing shape analysis. The ordinal order LM01-LM19 follows the published honey bee forewing landmark system used by Oleksa et al. (2023), DOI 10.1093/gigascience/giad019, and the referenced 19-landmark lineage dataset DOI 10.5281/zenodo.7567336. Keep this template in draft status until an administrator explicitly approves the anatomical definitions for production use.",
+  "landmarks": [
+    {
+      "ordinal": 1,
+      "label": "LM01",
+      "description": "Published Apis forewing fixed venation landmark 1 in the Oleksa/Tofilski 19-point ordinal sequence."
+    },
+    {
+      "ordinal": 2,
+      "label": "LM02",
+      "description": "Published Apis forewing fixed venation landmark 2 in the Oleksa/Tofilski 19-point ordinal sequence."
+    },
+    {
+      "ordinal": 3,
+      "label": "LM03",
+      "description": "Published Apis forewing fixed venation landmark 3 in the Oleksa/Tofilski 19-point ordinal sequence."
+    },
+    {
+      "ordinal": 4,
+      "label": "LM04",
+      "description": "Published Apis forewing fixed venation landmark 4 in the Oleksa/Tofilski 19-point ordinal sequence."
+    },
+    {
+      "ordinal": 5,
+      "label": "LM05",
+      "description": "Published Apis forewing fixed venation landmark 5 in the Oleksa/Tofilski 19-point ordinal sequence."
+    },
+    {
+      "ordinal": 6,
+      "label": "LM06",
+      "description": "Published Apis forewing fixed venation landmark 6 in the Oleksa/Tofilski 19-point ordinal sequence."
+    },
+    {
+      "ordinal": 7,
+      "label": "LM07",
+      "description": "Published Apis forewing fixed venation landmark 7 in the Oleksa/Tofilski 19-point ordinal sequence."
+    },
+    {
+      "ordinal": 8,
+      "label": "LM08",
+      "description": "Published Apis forewing fixed venation landmark 8 in the Oleksa/Tofilski 19-point ordinal sequence."
+    },
+    {
+      "ordinal": 9,
+      "label": "LM09",
+      "description": "Published Apis forewing fixed venation landmark 9 in the Oleksa/Tofilski 19-point ordinal sequence."
+    },
+    {
+      "ordinal": 10,
+      "label": "LM10",
+      "description": "Published Apis forewing fixed venation landmark 10 in the Oleksa/Tofilski 19-point ordinal sequence."
+    },
+    {
+      "ordinal": 11,
+      "label": "LM11",
+      "description": "Published Apis forewing fixed venation landmark 11 in the Oleksa/Tofilski 19-point ordinal sequence."
+    },
+    {
+      "ordinal": 12,
+      "label": "LM12",
+      "description": "Published Apis forewing fixed venation landmark 12 in the Oleksa/Tofilski 19-point ordinal sequence."
+    },
+    {
+      "ordinal": 13,
+      "label": "LM13",
+      "description": "Published Apis forewing fixed venation landmark 13 in the Oleksa/Tofilski 19-point ordinal sequence."
+    },
+    {
+      "ordinal": 14,
+      "label": "LM14",
+      "description": "Published Apis forewing fixed venation landmark 14 in the Oleksa/Tofilski 19-point ordinal sequence."
+    },
+    {
+      "ordinal": 15,
+      "label": "LM15",
+      "description": "Published Apis forewing fixed venation landmark 15 in the Oleksa/Tofilski 19-point ordinal sequence."
+    },
+    {
+      "ordinal": 16,
+      "label": "LM16",
+      "description": "Published Apis forewing fixed venation landmark 16 in the Oleksa/Tofilski 19-point ordinal sequence."
+    },
+    {
+      "ordinal": 17,
+      "label": "LM17",
+      "description": "Published Apis forewing fixed venation landmark 17 in the Oleksa/Tofilski 19-point ordinal sequence."
+    },
+    {
+      "ordinal": 18,
+      "label": "LM18",
+      "description": "Published Apis forewing fixed venation landmark 18 in the Oleksa/Tofilski 19-point ordinal sequence."
+    },
+    {
+      "ordinal": 19,
+      "label": "LM19",
+      "description": "Published Apis forewing fixed venation landmark 19 in the Oleksa/Tofilski 19-point ordinal sequence."
+    }
+  ]
+}

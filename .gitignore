@@ -15,6 +15,12 @@ data/
 *.db
 *.sqlite
 *.sqlite3
+reference-data/
+analysis-artifacts/
+model-artifacts/
+*.joblib
+*.pkl
+*.npz
 
 # Streamlit
 .streamlit/secrets.toml

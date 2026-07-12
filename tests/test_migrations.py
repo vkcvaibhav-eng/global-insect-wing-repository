@@ -39,13 +39,21 @@ def test_alembic_upgrades_an_empty_sqlite_database_to_head(
                 "annotation_points",
                 "reviews",
                 "repository_records",
+                "external_reference_datasets",
+                "external_reference_shapes",
+                "external_reference_import_issues",
+                "analysis_models",
+                "wing_analysis_runs",
+                "region_probabilities",
+                "lineage_probabilities",
+                "published_shape_matches",
                 "alembic_version",
             }
             assert expected_tables <= set(inspect(engine).get_table_names())
             with engine.connect() as connection:
                 assert connection.scalar(
                     text("SELECT version_num FROM alembic_version")
-                ) == "0004_deleted_annotation_status"
+                ) == "0005_published_apis_reference_analysis"
                 wing_columns = {
                     column["name"] for column in inspect(engine).get_columns("wing_images")
                 }

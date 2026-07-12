@@ -8,8 +8,10 @@ path from a student's specimen record and immutable image upload through
 template-specific landmark submission, expert review, permanent accessioning,
 repository browsing, and CSV/TPS export.
 
-It deliberately does not implement morphometric search, PCA, automated
-landmark detection, worldwide federation, or cross-template analysis.
+It deliberately does not implement automated landmark detection, worldwide
+federation, hindwing support, species identification, or cross-template
+analysis. It now includes an optional, narrowly scoped published-reference
+analysis module for complete 19-landmark `Apis mellifera` right forewings.
 
 ## System shape
 
@@ -20,6 +22,7 @@ flowchart LR
     ORM --> DB[("SQLite demo / PostgreSQL production")]
     SVC --> STORE["Immutable original-image storage<br/>local demo or Cloudflare R2"]
     SVC --> EXP["CSV and TPS serializers"]
+    SVC --> APIS["Published Apis reference analysis<br/>external data + versioned artifacts"]
 ```
 
 The modules have intentionally narrow responsibilities:
@@ -32,6 +35,12 @@ The modules have intentionally narrow responsibilities:
   image persistence, coordinate validation, accession allocation, and export.
 - `wing_repository/models.py` defines persistence entities and database-level
   constraints.
+- `wing_repository/morphometrics/` contains deterministic GPA, PCA projection,
+  CVA/LDA-style probabilities, nearest-shape search, empirical similarity
+  calibration, outlier detection, artifact checksums, and provenance helpers.
+- `wing_repository/reference_data.py` provides explicit CLI commands for
+  inspecting/importing external Apis datasets and building/activating versioned
+  analysis models.
 - `wing_repository/db.py` configures sessions and enables SQLite foreign keys.
 - `alembic/` contains schema migrations. Production and long-lived local
   databases are upgraded with Alembic, never with ad-hoc table creation.
@@ -47,6 +56,7 @@ The modules have intentionally narrow responsibilities:
 | Manual digitization | Yes | No | No |
 | My submissions | Yes | No | No |
 | Expert review | No | Yes | Yes |
+| Published Apis Reference Analysis | Yes | Yes | Yes |
 | Repository browser | Yes | Yes | Yes |
 | TPS and CSV export | Yes | Yes | Yes |
 | Administration summary/users/assignments | No | No | Yes |
@@ -82,6 +92,13 @@ page is not considered a security boundary.
   immutable submitted annotation revision.
 - **Repository records** are created only for approved revisions and bind a
   permanent accession to the image, coordinates, taxon, template, and review.
+- **External reference datasets** and **external reference shapes** represent
+  published coordinate sources. They retain source identifiers, coordinates,
+  checksums, metadata, DOI/licence provenance, and import timestamps. They are
+  never native specimens and never receive WBR accessions.
+- **Analysis models** are versioned, checksum-validated artifacts tied to one
+  exact landmark template. **Wing analysis runs** and result tables remain
+  linked to the model version that produced them.
 
 ## Workflow and immutability
 
@@ -111,6 +128,10 @@ terminal and append-only.
 Template identity is carried by foreign key throughout the workflow and is
 included in exports. The application never merges, compares, averages, or
 otherwise combines coordinates from different template IDs or versions.
+
+The published Apis analysis follows the same rule. It runs only when the query
+annotation uses the exact published 19-landmark template associated with the
+active model.
 
 ## Coordinate system
 
@@ -210,11 +231,15 @@ Passwords are stored as salted PBKDF2 hashes. Demo account passwords are read
 by the seed command from environment variables and are not embedded in
 application source.
 
+External research datasets are also outside source control. Production
+reference-data paths are configured with `WBR_OLEKSA_REFERENCE_DIR`,
+`WBR_NAWROCKA_REFERENCE_DIR`, `WBR_APIS_WORKFLOW_DIR`, and
+`WBR_ANALYSIS_ARTIFACT_DIR`.
+
 ## Future-safe constraints
 
-- No PCA columns or identifiers exist in Version 0.1. Future derived analyses
-  must identify their dataset, template version, preprocessing, and algorithm
-  version and remain reproducible from raw coordinates.
+- PCA scores are used only inside versioned analysis artifacts. They are never
+  saved as permanent universal identifiers.
 - Accessions are never edited or reused. A future withdrawal mechanism should
   retain the repository row and add status/reason metadata.
 - Published templates should be treated as immutable; corrections create a new
