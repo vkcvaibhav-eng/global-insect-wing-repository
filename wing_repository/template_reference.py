@@ -15,7 +15,9 @@ from wing_repository.models import LandmarkTemplate
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-REFERENCE_GUIDE_ROOT = PROJECT_ROOT / "demo_data" / "reference_guides"
+REFERENCE_ASSET_ROOT = PROJECT_ROOT / "repository_assets"
+REFERENCE_GUIDE_ROOT = REFERENCE_ASSET_ROOT / "reference_guides"
+LEGACY_ASSET_PREFIX = "demo_data/"
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,6 +56,8 @@ def _bundled_reference_guide(template: LandmarkTemplate) -> TemplateReferenceGui
 def _resolve_reference_source(uri: str) -> str:
     if uri.startswith(("https://", "http://")):
         return uri
+    if uri.startswith(LEGACY_ASSET_PREFIX):
+        uri = "repository_assets/" + uri.removeprefix(LEGACY_ASSET_PREFIX)
     reference_path = (PROJECT_ROOT / uri).resolve()
     root = PROJECT_ROOT.resolve()
     if reference_path != root and root not in reference_path.parents:

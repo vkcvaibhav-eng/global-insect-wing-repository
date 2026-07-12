@@ -43,7 +43,7 @@ from wing_repository.template_loader import create_template, load_template_defin
 
 APIS_TEMPLATE_PATH = (
     Path(__file__).resolve().parents[1]
-    / "demo_data"
+    / "repository_assets"
     / "templates"
     / "apis_standard_19_v2.json"
 )

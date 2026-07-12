@@ -1,1 +1,1 @@
-"""Repository maintenance and demonstration commands."""
+"""Repository maintenance commands."""

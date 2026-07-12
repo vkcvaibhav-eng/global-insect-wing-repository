@@ -18,8 +18,7 @@ from dotenv import load_dotenv
 DEFAULT_DATABASE_URL = "sqlite:///data/wing_repository.db"
 DEFAULT_DATA_DIR = Path("data")
 DEFAULT_MAX_UPLOAD_MB = 25
-DEFAULT_AUTO_BOOTSTRAP_DEMO = False
-DEFAULT_DEMO_RESET_PASSWORDS = False
+DEFAULT_BOOTSTRAP_ADMIN_RESET_PASSWORD = False
 DEFAULT_STORAGE_BACKEND = "local"
 
 
@@ -49,8 +48,10 @@ class Settings:
     database_url: str = DEFAULT_DATABASE_URL
     data_dir: Path = DEFAULT_DATA_DIR
     max_upload_mb: int = DEFAULT_MAX_UPLOAD_MB
-    auto_bootstrap_demo: bool = DEFAULT_AUTO_BOOTSTRAP_DEMO
-    demo_reset_passwords: bool = DEFAULT_DEMO_RESET_PASSWORDS
+    bootstrap_admin_email: str | None = None
+    bootstrap_admin_full_name: str | None = None
+    bootstrap_admin_password: str | None = None
+    bootstrap_admin_reset_password: bool = DEFAULT_BOOTSTRAP_ADMIN_RESET_PASSWORD
     storage_backend: str = DEFAULT_STORAGE_BACKEND
     r2_endpoint_url: str | None = None
     r2_bucket_name: str | None = None
@@ -72,8 +73,8 @@ class Settings:
     def from_env(cls) -> "Settings":
         """Build settings from the environment.
 
-        A local ``.env`` file is useful for the demonstration; deployments
-        should inject the same variables through their secret manager.
+        A local ``.env`` file is useful for development; deployments should
+        inject the same variables through their secret manager.
         """
 
         load_dotenv()
@@ -95,19 +96,15 @@ class Settings:
             ),
             data_dir=Path(os.getenv("WBR_DATA_DIR", str(DEFAULT_DATA_DIR))),
             max_upload_mb=max_upload_mb,
-            auto_bootstrap_demo=_environment_bool(
+            bootstrap_admin_email=os.getenv("WBR_BOOTSTRAP_ADMIN_EMAIL"),
+            bootstrap_admin_full_name=os.getenv("WBR_BOOTSTRAP_ADMIN_FULL_NAME"),
+            bootstrap_admin_password=os.getenv("WBR_BOOTSTRAP_ADMIN_PASSWORD"),
+            bootstrap_admin_reset_password=_environment_bool(
                 os.getenv(
-                    "WBR_AUTO_BOOTSTRAP_DEMO",
-                    str(DEFAULT_AUTO_BOOTSTRAP_DEMO),
+                    "WBR_BOOTSTRAP_ADMIN_RESET_PASSWORD",
+                    str(DEFAULT_BOOTSTRAP_ADMIN_RESET_PASSWORD),
                 ),
-                "WBR_AUTO_BOOTSTRAP_DEMO",
-            ),
-            demo_reset_passwords=_environment_bool(
-                os.getenv(
-                    "WBR_DEMO_RESET_PASSWORDS",
-                    str(DEFAULT_DEMO_RESET_PASSWORDS),
-                ),
-                "WBR_DEMO_RESET_PASSWORDS",
+                "WBR_BOOTSTRAP_ADMIN_RESET_PASSWORD",
             ),
             storage_backend=storage_backend,
             r2_endpoint_url=os.getenv("WBR_R2_ENDPOINT_URL"),

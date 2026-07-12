@@ -1,7 +1,7 @@
 """SQLAlchemy persistence model for the version 0.1 repository.
 
 The database stores enum values as constrained strings rather than native
-PostgreSQL enums. This keeps SQLite demonstrations and PostgreSQL production
+PostgreSQL enums. This keeps SQLite development and PostgreSQL production
 schemas equivalent and makes future vocabulary migrations explicit.
 """
 

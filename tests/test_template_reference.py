@@ -34,7 +34,7 @@ def test_reference_guide_can_be_read_from_template_source_json() -> None:
             source_json=json.dumps(
                 {
                     "reference_image": {
-                        "uri": "demo_data/reference_guides/apis_standard_19_v2_landmark_guide.png",
+                        "uri": "repository_assets/reference_guides/apis_standard_19_v2_landmark_guide.png",
                         "caption": "Custom guide",
                         "citation": "Custom citation",
                     }
@@ -50,6 +50,31 @@ def test_reference_guide_can_be_read_from_template_source_json() -> None:
     assert Path(guide.source).exists()
     assert guide.caption == "Custom guide"
     assert guide.citation == "Custom citation"
+
+
+def test_legacy_demo_data_reference_uri_is_remapped() -> None:
+    template = cast(
+        LandmarkTemplate,
+        SimpleNamespace(
+            version=2,
+            source_json=json.dumps(
+                {
+                    "reference_image": {
+                        "uri": "demo_data/reference_guides/apis_standard_19_v2_landmark_guide.png",
+                        "caption": "Legacy guide",
+                    }
+                }
+            ),
+            taxon=SimpleNamespace(genus_code="APIS"),
+        ),
+    )
+
+    guide = template_reference_guide(template)
+
+    assert guide is not None
+    assert Path(guide.source).exists()
+    assert "repository_assets" in guide.source
+    assert guide.caption == "Legacy guide"
 
 
 def test_reference_guide_missing_when_not_configured() -> None:

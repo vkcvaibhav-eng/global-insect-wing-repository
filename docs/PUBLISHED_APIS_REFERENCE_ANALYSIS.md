@@ -69,7 +69,7 @@ requires:
 
 The required template JSON is:
 
-`demo_data/templates/apis_standard_19_v2.json`
+`repository_assets/templates/apis_standard_19_v2.json`
 
 It is the only bundled active Apis template and is published by default. Its
 internal version remains `2` so any historical Version 1 teaching annotations

@@ -25,18 +25,18 @@
    reference length and two clicked endpoints on that image; raw pixel and
    normalized coordinates remain preserved even when millimeter coordinates are
    derived.
-11. The sample wing image is a synthetic demonstration drawing, explicitly not
-   a taxonomic reference specimen.
-12. SQLite supports a local, low-concurrency demonstration only. PostgreSQL is
+11. The bundled guide image is a visual landmark-placement aid only; it is not
+   a specimen record and never contributes saved coordinates.
+12. SQLite supports local, low-concurrency development only. PostgreSQL is
     required for concurrent or production use.
 13. CSV and TPS exports contain approved repository records only and are split
     or filtered by one exact landmark-template version. Cross-version export is
     rejected rather than combined automatically.
-14. Student self-signup uses email/password only. Version 0.1 does not send
-    verification email or implement Google OAuth; administrator approval is the
-    account activation gate.
-15. Authentication is suitable for a local milestone demonstration. Production
-    deployment requires HTTPS, institutional account lifecycle controls,
-    rate-limiting, session hardening, backups, and security review.
+14. Student/reviewer self-signup uses email/password only. Version 0.1 does not
+    send verification email or implement Google OAuth; administrator approval
+    is the account activation gate.
+15. Authentication is suitable for this first institutional milestone only.
+    Production deployment requires HTTPS, institutional account lifecycle
+    controls, rate-limiting, session hardening, backups, and security review.
 16. Machine learning, automated landmark detection, WingSearch, generalized
     Procrustes analysis, and PCA are outside Version 0.1.

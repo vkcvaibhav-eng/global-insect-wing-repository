@@ -1,4 +1,4 @@
-"""Opt-in database bootstrap for disposable hosted demonstrations."""
+"""Database migration and first-administrator bootstrap for hosted deployments."""
 
 from __future__ import annotations
 
@@ -14,6 +14,10 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from wing_repository.config import Settings, get_settings
 from wing_repository.db import SessionLocal, engine
+from wing_repository.institution_bootstrap import (
+    ensure_institution_bootstrap,
+    institution_bootstrap_is_configured,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -54,7 +58,7 @@ def _upgrade_existing_alembic_schema(app_engine: Engine) -> None:
         command.upgrade(_alembic_config(), "head")
 
 
-def _prepare_demo_storage(settings: Settings) -> None:
+def _prepare_storage(settings: Settings) -> None:
     """Create writable local directories before the first SQLite connection."""
 
     settings.data_dir.expanduser().mkdir(parents=True, exist_ok=True)
@@ -73,40 +77,31 @@ def ensure_database_ready(
     session_factory: sessionmaker[Session] = SessionLocal,
     settings: Settings | None = None,
 ) -> bool:
-    """Return whether the schema exists, optionally creating a demo database.
+    """Return whether the schema exists, optionally creating the first admin.
 
-    Automatic migration and seeding are deliberately gated behind
-    ``WBR_AUTO_BOOTSTRAP_DEMO``. The mode is intended for disposable Streamlit
-    Community Cloud demonstrations only, never production repositories.
+    Empty hosted databases are initialized only when
+    ``WBR_BOOTSTRAP_ADMIN_EMAIL`` is configured. This creates the schema, one
+    real administrator account, and the bundled standard Apis template. It does
+    not seed example users, synthetic specimens, or synthetic annotations.
     """
 
     active_settings = settings or get_settings()
-    if active_settings.auto_bootstrap_demo:
-        _prepare_demo_storage(active_settings)
+    if institution_bootstrap_is_configured(active_settings):
+        _prepare_storage(active_settings)
     with _bootstrap_lock:
         with _database_bootstrap_lock(app_engine):
             if not inspect(app_engine).has_table("users"):
-                if not active_settings.auto_bootstrap_demo:
+                if not institution_bootstrap_is_configured(active_settings):
                     return False
                 command.upgrade(_alembic_config(), "head")
-
-                # Import lazily so ordinary production startup does not depend on the
-                # repository maintenance command package.
-                from scripts.seed_demo import seed_demo
-
                 with session_factory() as session:
-                    seed_demo(session)
+                    ensure_institution_bootstrap(session, active_settings)
                 return inspect(app_engine).has_table("users")
 
             _upgrade_existing_alembic_schema(app_engine)
-            if active_settings.auto_bootstrap_demo and active_settings.demo_reset_passwords:
-                from scripts.seed_demo import seed_demo_accounts
-
+            if institution_bootstrap_is_configured(active_settings):
                 with session_factory() as session:
-                    seed_demo_accounts(
-                        session,
-                        reset_passwords=active_settings.demo_reset_passwords,
-                    )
+                    ensure_institution_bootstrap(session, active_settings)
             return True
 
 

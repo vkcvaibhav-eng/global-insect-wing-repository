@@ -6,28 +6,24 @@ from wing_repository.config import Settings
 from wing_repository.image_store import LocalImageStore, image_store_from_settings
 
 
-@pytest.mark.parametrize("value", ["true", "1", "YES", "on"])
-def test_demo_bootstrap_truthy_environment(monkeypatch, value: str) -> None:
-    monkeypatch.setenv("WBR_AUTO_BOOTSTRAP_DEMO", value)
-    assert Settings.from_env().auto_bootstrap_demo
+def test_bootstrap_admin_settings_are_read_from_environment(monkeypatch) -> None:
+    monkeypatch.setenv("WBR_BOOTSTRAP_ADMIN_EMAIL", "curator@institute.edu")
+    monkeypatch.setenv("WBR_BOOTSTRAP_ADMIN_FULL_NAME", "Institute Curator")
+    monkeypatch.setenv("WBR_BOOTSTRAP_ADMIN_PASSWORD", "curator-password-2026")
+    monkeypatch.setenv("WBR_BOOTSTRAP_ADMIN_RESET_PASSWORD", "yes")
+
+    settings = Settings.from_env()
+
+    assert settings.bootstrap_admin_email == "curator@institute.edu"
+    assert settings.bootstrap_admin_full_name == "Institute Curator"
+    assert settings.bootstrap_admin_password == "curator-password-2026"
+    assert settings.bootstrap_admin_reset_password
 
 
-@pytest.mark.parametrize("value", ["false", "0", "NO", "off"])
-def test_demo_bootstrap_falsey_environment(monkeypatch, value: str) -> None:
-    monkeypatch.setenv("WBR_AUTO_BOOTSTRAP_DEMO", value)
-    assert not Settings.from_env().auto_bootstrap_demo
-
-
-def test_demo_bootstrap_rejects_ambiguous_environment(monkeypatch) -> None:
-    monkeypatch.setenv("WBR_AUTO_BOOTSTRAP_DEMO", "sometimes")
+def test_bootstrap_admin_reset_flag_rejects_ambiguous_environment(monkeypatch) -> None:
+    monkeypatch.setenv("WBR_BOOTSTRAP_ADMIN_RESET_PASSWORD", "sometimes")
     with pytest.raises(ValueError, match="must be true or false"):
         Settings.from_env()
-
-
-def test_demo_password_reset_flag_uses_environment_bool(monkeypatch) -> None:
-    monkeypatch.setenv("WBR_DEMO_RESET_PASSWORDS", "yes")
-
-    assert Settings.from_env().demo_reset_passwords
 
 
 def test_default_storage_backend_is_local(monkeypatch) -> None:

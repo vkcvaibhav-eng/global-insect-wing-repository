@@ -20,7 +20,7 @@ from wing_repository.template_loader import (
 
 STANDARD_TEMPLATE = (
     Path(__file__).resolve().parents[1]
-    / "demo_data"
+    / "repository_assets"
     / "templates"
     / "apis_standard_19_v2.json"
 )
@@ -54,7 +54,7 @@ def test_apis_standard_template_declares_reference_image() -> None:
     assert definition.reference_image is not None
     assert (
         definition.reference_image.uri
-        == "demo_data/reference_guides/apis_standard_19_v2_landmark_guide.png"
+        == "repository_assets/reference_guides/apis_standard_19_v2_landmark_guide.png"
     )
     assert definition.reference_image.caption is not None
     assert "visual placement reference" in definition.reference_image.caption

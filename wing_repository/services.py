@@ -56,7 +56,7 @@ from .template_loader import create_template, load_template_definition
 MIN_ACCOUNT_PASSWORD_CHARACTERS = 12
 BUNDLED_STANDARD_TEMPLATE_PATH = (
     Path(__file__).resolve().parents[1]
-    / "demo_data"
+    / "repository_assets"
     / "templates"
     / "apis_standard_19_v2.json"
 )
@@ -178,14 +178,18 @@ def _validated_account_password(password: str, label: str = "Password") -> str:
     return password
 
 
-def request_student_signup(
+def request_account_signup(
     session: Session,
     *,
     email: str,
     full_name: str,
     password: str,
+    role: Role,
 ) -> User:
-    """Create an inactive student account request for administrator approval."""
+    """Create an inactive student/reviewer account request for admin approval."""
+
+    if role not in {Role.STUDENT, Role.EXPERT_REVIEWER}:
+        raise ValidationError("Only student or expert reviewer signup is supported.")
 
     normalized_email = normalize_email(email)
     normalized_name = _required_text(full_name, "Full name", max_length=200)
@@ -193,7 +197,7 @@ def request_student_signup(
         email=normalized_email,
         full_name=normalized_name,
         password_hash=hash_password(_validated_account_password(password)),
-        role=Role.STUDENT,
+        role=role,
         is_active=False,
     )
     session.add(user)
@@ -203,6 +207,24 @@ def request_student_signup(
         session.rollback()
         raise ConflictError("An account already exists for that email.") from exc
     return user
+
+
+def request_student_signup(
+    session: Session,
+    *,
+    email: str,
+    full_name: str,
+    password: str,
+) -> User:
+    """Backward-compatible helper for inactive student signup requests."""
+
+    return request_account_signup(
+        session,
+        email=email,
+        full_name=full_name,
+        password=password,
+        role=Role.STUDENT,
+    )
 
 
 def approve_user_account(
@@ -1354,6 +1376,7 @@ __all__ = [
     "list_submitted_annotations",
     "place_annotation_point",
     "require_active_role",
+    "request_account_signup",
     "request_student_signup",
     "return_annotation",
     "submit_annotation",

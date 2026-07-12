@@ -10,14 +10,13 @@ import streamlit as st
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from wing_repository.db import SessionLocal, engine
 from wing_repository.bootstrap import ensure_database_ready
-from wing_repository.config import get_settings
+from wing_repository.db import SessionLocal
 from wing_repository.enums import Role
 from wing_repository.errors import RepositoryError, ValidationError
 from wing_repository.models import User
 from wing_repository.security import normalize_email, verify_password
-from wing_repository.services import request_student_signup
+from wing_repository.services import request_account_signup
 from wing_repository.ui.navigation import (
     CURRENT_PAGE_KEY,
     apply_queued_page_navigation,
@@ -42,23 +41,10 @@ def _render_login(session: Session) -> None:
     st.title("Global Insect Wing Repository")
     st.caption("Version 0.1 · Hymenoptera · right forewing manual digitization")
     st.info(
-        "Sign in with an approved account, or request a student account below. "
-        "Student signup uses email/password in Version 0.1; administrators "
-        "must approve accounts before login."
+        "Sign in with an approved account, or request a student/reviewer account "
+        "below. Administrators must approve accounts before login."
     )
-    if get_settings().auto_bootstrap_demo:
-        settings = get_settings()
-        if settings.database_url.startswith("sqlite:"):
-            st.warning(
-                "Hosted demonstration mode uses disposable SQLite storage. Data "
-                "can be reset when the app restarts or is redeployed."
-            )
-        else:
-            st.info(
-                "Demo bootstrap is enabled for startup provisioning. After the "
-                "first successful run, set WBR_AUTO_BOOTSTRAP_DEMO to false."
-            )
-    sign_in_tab, signup_tab = st.tabs(["Sign in", "Student signup request"])
+    sign_in_tab, signup_tab = st.tabs(["Sign in", "Account signup request"])
     with sign_in_tab:
         with st.form("login_form", clear_on_submit=False):
             email = st.text_input("Email", autocomplete="email")
@@ -86,12 +72,18 @@ def _render_login(session: Session) -> None:
 
     with signup_tab:
         st.caption(
-            "Students may request their own account with a Gmail or institutional "
-            "email. The account remains pending until an administrator approves it."
+            "Students and expert reviewers may request accounts with their own "
+            "Gmail or institutional email. The account remains pending until an "
+            "administrator approves it."
         )
-        with st.form("student_signup_form", clear_on_submit=True):
+        with st.form("account_signup_form", clear_on_submit=True):
             signup_name = st.text_input("Full name")
             signup_email = st.text_input("Email", autocomplete="email")
+            signup_role = st.selectbox(
+                "Requested role",
+                [Role.STUDENT, Role.EXPERT_REVIEWER],
+                format_func=lambda role: role.value.replace("_", " ").title(),
+            )
             signup_password = st.text_input(
                 "Password",
                 type="password",
@@ -103,20 +95,18 @@ def _render_login(session: Session) -> None:
                 type="password",
                 autocomplete="new-password",
             )
-            signup_submitted = st.form_submit_button(
-                "Request student account",
-                type="primary",
-            )
+            signup_submitted = st.form_submit_button("Request account", type="primary")
         if signup_submitted:
             if signup_password != signup_password_confirm:
                 st.error("Passwords do not match.")
                 return
             try:
-                request_student_signup(
+                request_account_signup(
                     session,
                     email=signup_email,
                     full_name=signup_name,
                     password=signup_password,
+                    role=signup_role,
                 )
             except RepositoryError as exc:
                 st.error(str(exc))
@@ -188,7 +178,7 @@ def run() -> None:
 
     st.set_page_config(
         page_title="Global Insect Wing Repository",
-        page_icon="🪽",
+        page_icon="🪰",
         layout="wide",
     )
     try:
@@ -197,14 +187,17 @@ def run() -> None:
         logger.exception("Database initialization failed")
         st.error("The configured database could not be initialized.")
         st.code(
-            "Check DATABASE_URL and demo bootstrap secrets, then run: "
+            "Check DATABASE_URL and bootstrap-admin secrets, then run: "
             "alembic upgrade head"
         )
         st.code(_safe_error_detail(exc))
         st.stop()
     if not schema_ready:
         st.warning("The database schema has not been created yet.")
-        st.code("alembic upgrade head\npython scripts/seed_demo.py")
+        st.code(
+            "Configure WBR_BOOTSTRAP_ADMIN_EMAIL and "
+            "WBR_BOOTSTRAP_ADMIN_PASSWORD, then reboot the app."
+        )
         st.stop()
 
     with SessionLocal() as session:

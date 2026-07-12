@@ -4,20 +4,20 @@ from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import func, select
-from sqlalchemy import inspect, text
+from sqlalchemy import func, inspect, select, text
 
 from wing_repository.bootstrap import ensure_database_ready
-from wing_repository.config import Settings, get_settings
+from wing_repository.config import get_settings
 from wing_repository.db import build_engine, build_session_factory
-from wing_repository.models import RepositoryRecord, User
+from wing_repository.enums import Role, TemplateStatus
+from wing_repository.models import LandmarkTemplate, RepositoryRecord, User
 from wing_repository.security import verify_password
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_opt_in_demo_bootstrap_migrates_and_seeds_idempotently(
+def test_institution_bootstrap_migrates_and_creates_real_admin(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -27,10 +27,9 @@ def test_opt_in_demo_bootstrap_migrates_and_seeds_idempotently(
     environment = {
         "DATABASE_URL": database_url,
         "WBR_DATA_DIR": str(data_dir),
-        "WBR_AUTO_BOOTSTRAP_DEMO": "true",
-        "WBR_DEMO_ADMIN_PASSWORD": "bootstrap-admin-123",
-        "WBR_DEMO_STUDENT_PASSWORD": "bootstrap-student-123",
-        "WBR_DEMO_REVIEWER_PASSWORD": "bootstrap-reviewer-123",
+        "WBR_BOOTSTRAP_ADMIN_EMAIL": "curator@institute.edu",
+        "WBR_BOOTSTRAP_ADMIN_FULL_NAME": "Institute Curator",
+        "WBR_BOOTSTRAP_ADMIN_PASSWORD": "curator-password-2026",
     }
     for key, value in environment.items():
         monkeypatch.setenv(key, value)
@@ -51,11 +50,22 @@ def test_opt_in_demo_bootstrap_migrates_and_seeds_idempotently(
             settings=settings,
         )
         with factory() as session:
-            assert session.scalar(select(func.count()).select_from(User)) == 3
+            assert session.scalar(select(func.count()).select_from(User)) == 1
             assert (
                 session.scalar(select(func.count()).select_from(RepositoryRecord))
-                == 1
+                == 0
             )
+            admin = session.scalar(
+                select(User).where(User.email == "curator@institute.edu")
+            )
+            assert admin is not None
+            assert admin.role is Role.ADMINISTRATOR
+            assert admin.is_active
+            assert verify_password("curator-password-2026", admin.password_hash)
+            template = session.scalar(select(LandmarkTemplate))
+            assert template is not None
+            assert template.status is TemplateStatus.PUBLISHED
+            assert len(template.landmarks) == 19
     finally:
         app_engine.dispose()
         get_settings.cache_clear()
@@ -98,7 +108,7 @@ def test_existing_alembic_database_is_upgraded_on_startup(
         get_settings.cache_clear()
 
 
-def test_demo_bootstrap_remains_disabled_by_default(tmp_path: Path) -> None:
+def test_bootstrap_requires_admin_configuration_for_empty_database(tmp_path: Path) -> None:
     database_url = f"sqlite:///{(tmp_path / 'empty.sqlite3').as_posix()}"
     app_engine = build_engine(database_url)
     factory = build_session_factory(app_engine)
@@ -111,7 +121,7 @@ def test_demo_bootstrap_remains_disabled_by_default(tmp_path: Path) -> None:
         app_engine.dispose()
 
 
-def test_demo_bootstrap_can_reset_existing_demo_passwords(
+def test_institution_bootstrap_can_reset_admin_password(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -121,10 +131,9 @@ def test_demo_bootstrap_can_reset_existing_demo_passwords(
     environment = {
         "DATABASE_URL": database_url,
         "WBR_DATA_DIR": str(data_dir),
-        "WBR_AUTO_BOOTSTRAP_DEMO": "true",
-        "WBR_DEMO_ADMIN_PASSWORD": "old-admin-password",
-        "WBR_DEMO_STUDENT_PASSWORD": "old-student-password",
-        "WBR_DEMO_REVIEWER_PASSWORD": "old-reviewer-password",
+        "WBR_BOOTSTRAP_ADMIN_EMAIL": "curator@institute.edu",
+        "WBR_BOOTSTRAP_ADMIN_FULL_NAME": "Institute Curator",
+        "WBR_BOOTSTRAP_ADMIN_PASSWORD": "old-curator-password",
     }
     for key, value in environment.items():
         monkeypatch.setenv(key, value)
@@ -139,16 +148,14 @@ def test_demo_bootstrap_can_reset_existing_demo_passwords(
             settings=get_settings(),
         )
         with factory() as session:
-            student = session.scalar(
-                select(User).where(User.email == "student@example.test")
+            admin = session.scalar(
+                select(User).where(User.email == "curator@institute.edu")
             )
-            assert student is not None
-            assert verify_password("old-student-password", student.password_hash)
+            assert admin is not None
+            assert verify_password("old-curator-password", admin.password_hash)
 
-        monkeypatch.setenv("WBR_DEMO_ADMIN_PASSWORD", "new-admin-password")
-        monkeypatch.setenv("WBR_DEMO_STUDENT_PASSWORD", "new-student-password")
-        monkeypatch.setenv("WBR_DEMO_REVIEWER_PASSWORD", "new-reviewer-password")
-        monkeypatch.setenv("WBR_DEMO_RESET_PASSWORDS", "true")
+        monkeypatch.setenv("WBR_BOOTSTRAP_ADMIN_PASSWORD", "new-curator-password")
+        monkeypatch.setenv("WBR_BOOTSTRAP_ADMIN_RESET_PASSWORD", "true")
         get_settings.cache_clear()
         assert ensure_database_ready(
             app_engine=app_engine,
@@ -156,12 +163,12 @@ def test_demo_bootstrap_can_reset_existing_demo_passwords(
             settings=get_settings(),
         )
         with factory() as session:
-            student = session.scalar(
-                select(User).where(User.email == "student@example.test")
+            admin = session.scalar(
+                select(User).where(User.email == "curator@institute.edu")
             )
-            assert student is not None
-            assert not verify_password("old-student-password", student.password_hash)
-            assert verify_password("new-student-password", student.password_hash)
+            assert admin is not None
+            assert not verify_password("old-curator-password", admin.password_hash)
+            assert verify_password("new-curator-password", admin.password_hash)
     finally:
         app_engine.dispose()
         get_settings.cache_clear()

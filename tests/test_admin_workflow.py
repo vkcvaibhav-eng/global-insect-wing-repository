@@ -18,6 +18,7 @@ from wing_repository.services import (
     authenticate_user,
     create_user_account,
     import_bundled_standard_template,
+    request_account_signup,
     request_student_signup,
 )
 
@@ -38,6 +39,36 @@ def test_student_signup_creates_pending_inactive_account(
     assert created.role is Role.STUDENT
     assert not created.is_active
     assert verify_password("student-signup-password-2026", created.password_hash)
+
+
+def test_reviewer_signup_creates_pending_inactive_account(
+    db_session: Session,
+) -> None:
+    created = request_account_signup(
+        db_session,
+        email=" Reviewer.Signup@Institute.EDU ",
+        full_name=" Reviewer Signup ",
+        password="reviewer-signup-password-2026",
+        role=Role.EXPERT_REVIEWER,
+    )
+
+    assert created.id is not None
+    assert created.email == "reviewer.signup@institute.edu"
+    assert created.full_name == "Reviewer Signup"
+    assert created.role is Role.EXPERT_REVIEWER
+    assert not created.is_active
+    assert verify_password("reviewer-signup-password-2026", created.password_hash)
+
+
+def test_signup_rejects_administrator_role(db_session: Session) -> None:
+    with pytest.raises(ValidationError, match="student or expert reviewer"):
+        request_account_signup(
+            db_session,
+            email="admin.signup@institute.edu",
+            full_name="Admin Signup",
+            password="admin-signup-password-2026",
+            role=Role.ADMINISTRATOR,
+        )
 
 
 def test_pending_student_signup_cannot_authenticate_until_approved(

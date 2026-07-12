@@ -55,6 +55,7 @@ def _pending_user_rows(users: list[User]) -> pd.DataFrame:
                 "user_id": pending_user.id,
                 "full_name": pending_user.full_name,
                 "email": pending_user.email,
+                "role": pending_user.role.value.replace("_", " "),
                 "requested_at": pending_user.created_at,
             }
             for pending_user in users
@@ -85,37 +86,38 @@ def render_administration(session: Session, user: User) -> None:
     )
     metrics[3].metric("Approved records", _count(session, RepositoryRecord))
 
-    st.subheader("Approve student signups")
-    pending_students = list(
+    st.subheader("Approve account signups")
+    pending_accounts = list(
         session.scalars(
             select(User)
             .where(
-                User.role == Role.STUDENT,
+                User.role.in_([Role.STUDENT, Role.EXPERT_REVIEWER]),
                 User.is_active.is_(False),
             )
             .order_by(User.created_at.asc(), User.id.asc())
         )
     )
-    if not pending_students:
-        st.info("No student signup requests are waiting for approval.")
+    if not pending_accounts:
+        st.info("No account signup requests are waiting for approval.")
     else:
         st.dataframe(
-            _pending_user_rows(pending_students),
+            _pending_user_rows(pending_accounts),
             hide_index=True,
             width="stretch",
         )
         pending_by_id = {
-            pending_user.id: pending_user for pending_user in pending_students
+            pending_user.id: pending_user for pending_user in pending_accounts
         }
         selected_pending_id = st.selectbox(
-            "Pending student to approve",
+            "Pending account to approve",
             list(pending_by_id),
             format_func=lambda user_id: (
                 f"{pending_by_id[user_id].full_name} · "
-                f"{pending_by_id[user_id].email}"
+                f"{pending_by_id[user_id].email} · "
+                f"{pending_by_id[user_id].role.value.replace('_', ' ').title()}"
             ),
         )
-        if st.button("Approve selected student", type="primary"):
+        if st.button("Approve selected account", type="primary"):
             approved = approve_user_account(
                 session,
                 user,

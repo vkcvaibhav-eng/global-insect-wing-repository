@@ -19,8 +19,8 @@ analysis module for complete 19-landmark `Apis mellifera` right forewings.
 flowchart LR
     UI["Streamlit pages"] --> SVC["Domain services"]
     SVC --> ORM["SQLAlchemy models"]
-    ORM --> DB[("SQLite demo / PostgreSQL production")]
-    SVC --> STORE["Immutable original-image storage<br/>local demo or Cloudflare R2"]
+    ORM --> DB[("SQLite local / PostgreSQL production")]
+    SVC --> STORE["Immutable original-image storage<br/>local or Cloudflare R2"]
     SVC --> EXP["CSV and TPS serializers"]
     SVC --> APIS["Published Apis reference analysis<br/>external data + versioned artifacts"]
 ```
@@ -49,7 +49,7 @@ The modules have intentionally narrow responsibilities:
 
 | Page | Student | Reviewer | Administrator |
 |---|---:|---:|---:|
-| Login and student signup request | Yes | Yes | Yes |
+| Login and account signup request | Yes | Yes | Yes |
 | Student dashboard | Yes | No | No |
 | Specimen metadata | Yes | No | No |
 | Wing-image upload | Yes | No | No |
@@ -67,15 +67,16 @@ page is not considered a security boundary.
 ## Core data model
 
 - **Users** have exactly one role: administrator, student, or expert reviewer.
-  Student self-signup creates an inactive student row; administrator approval
-  switches the account active before login or assignment.
+  Student/reviewer self-signup creates an inactive account row; administrator
+  approval switches the account active before login or assignment. The first
+  administrator is bootstrapped from deployment secrets.
 - **Taxa** are genus-level Hymenoptera records with a stable, manually assigned
   uppercase `genus_code`. The code is part of permanent accessions and is not
   recomputed from a renamed taxon.
 - **Landmark templates** belong to one taxon and one explicit version. Their
   ordered **template landmarks** define the required point sequence.
 - **Assignments** connect one active student to one genus and an exact template
-  version. Administrators approve pending student signups, can create
+  version. Administrators approve pending account signups, can create
   student/reviewer accounts directly when needed, and assign unassigned
   students. Version 0.1 permits one active assignment per student.
 - **Specimens** contain contributor-supplied collection and voucher metadata
@@ -178,7 +179,7 @@ Version 0.1 supports two original-image storage backends behind the same
 service interface:
 
 - `local` writes under `WBR_DATA_DIR/originals` for development and disposable
-  single-user demonstrations.
+  local single-user development.
 - `r2` writes to Cloudflare R2 through its S3-compatible API for hosted
   Streamlit deployments where local files are ephemeral.
 
@@ -203,7 +204,7 @@ accession string and `(taxon, serial)`. A repeated approval request is
 idempotent and returns the existing repository record.
 
 PostgreSQL row locking supplies production concurrency control. SQLite is only
-the single-user demonstration backend.
+the local single-user development backend.
 
 ## Digitizer boundary
 
@@ -227,9 +228,9 @@ be tested rather than inferred.
 Configuration comes from environment variables. SQLite plus local image storage
 is the documented local default. Hosted or multi-user deployments use a
 PostgreSQL SQLAlchemy URL and durable object storage, currently Cloudflare R2.
-Passwords are stored as salted PBKDF2 hashes. Demo account passwords are read
-by the seed command from environment variables and are not embedded in
-application source.
+Passwords are stored as salted PBKDF2 hashes. The first real administrator can
+be bootstrapped from deployment secrets; student and reviewer accounts are
+created with their own email addresses and administrator approval.
 
 External research datasets are also outside source control. Production
 reference-data paths are configured with `WBR_OLEKSA_REFERENCE_DIR`,
@@ -246,4 +247,4 @@ reference-data paths are configured with `WBR_OLEKSA_REFERENCE_DIR`,
   version.
 - PostgreSQL, object storage, audit logging, institutional identity, and a
   custom digitizer component are production hardening work, not hidden behind
-  the local demo.
+  the local development mode.
