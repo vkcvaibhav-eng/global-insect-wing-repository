@@ -25,14 +25,17 @@ from wing_repository.models import (
 )
 from wing_repository.services import (
     calibrate_wing_image_scale,
+    clone_preserved_annotation,
     clone_returned_annotation,
     create_draft_annotation,
     create_specimen_with_image,
     delete_annotation_point,
     place_annotation_point,
     return_annotation,
+    list_submitted_annotations,
     submit_annotation,
     undo_last_point,
+    withdraw_submitted_annotation,
 )
 
 
@@ -376,6 +379,88 @@ def test_submitted_annotation_is_immutable_and_return_clones_history(
         ).id
         == revision.id
     )
+
+
+def test_student_can_withdraw_unreviewed_submission_and_create_replacement(
+    db_session: Session,
+    student: User,
+    reviewer: User,
+    assignment: Assignment,
+    landmark_template: LandmarkTemplate,
+    image_store: LocalImageStore,
+    image_bytes: bytes,
+) -> None:
+    image = _uploaded_image(db_session, student, assignment, image_store, image_bytes)
+    submitted = submit_annotation(
+        db_session,
+        student,
+        annotation_id=_complete_draft(db_session, student, image, landmark_template).id,
+    )
+
+    assert submitted in list_submitted_annotations(db_session, reviewer)
+    withdrawn = withdraw_submitted_annotation(
+        db_session,
+        student,
+        annotation_id=submitted.id,
+    )
+
+    assert withdrawn.status is AnnotationStatus.WITHDRAWN
+    assert withdrawn.submitted_at is not None
+    assert withdrawn not in list_submitted_annotations(db_session, reviewer)
+
+    replacement = clone_preserved_annotation(
+        db_session,
+        student,
+        annotation_id=withdrawn.id,
+    )
+    assert replacement.status is AnnotationStatus.DRAFT
+    assert replacement.parent_annotation_id == withdrawn.id
+    assert replacement.revision_number == withdrawn.revision_number + 1
+    assert [
+        (point.template_landmark_id, point.x_pixel, point.y_pixel)
+        for point in sorted(replacement.points, key=lambda item: item.template_landmark_id)
+    ] == [
+        (point.template_landmark_id, point.x_pixel, point.y_pixel)
+        for point in sorted(withdrawn.points, key=lambda item: item.template_landmark_id)
+    ]
+
+
+def test_student_cannot_withdraw_another_or_reviewed_submission(
+    db_session: Session,
+    student: User,
+    second_student: User,
+    reviewer: User,
+    assignment: Assignment,
+    landmark_template: LandmarkTemplate,
+    image_store: LocalImageStore,
+    image_bytes: bytes,
+) -> None:
+    image = _uploaded_image(db_session, student, assignment, image_store, image_bytes)
+    submitted = submit_annotation(
+        db_session,
+        student,
+        annotation_id=_complete_draft(db_session, student, image, landmark_template).id,
+    )
+
+    with pytest.raises(AuthorizationError):
+        withdraw_submitted_annotation(
+            db_session,
+            second_student,
+            annotation_id=submitted.id,
+        )
+
+    return_annotation(
+        db_session,
+        reviewer,
+        annotation_id=submitted.id,
+        comments="Please revise.",
+    )
+    with pytest.raises(InvalidStateError):
+        withdraw_submitted_annotation(
+            db_session,
+            student,
+            annotation_id=submitted.id,
+        )
 
 
 def test_review_requires_reviewer_role_and_nonblank_return_comments(

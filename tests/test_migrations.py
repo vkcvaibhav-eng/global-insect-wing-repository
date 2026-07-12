@@ -45,7 +45,7 @@ def test_alembic_upgrades_an_empty_sqlite_database_to_head(
             with engine.connect() as connection:
                 assert connection.scalar(
                     text("SELECT version_num FROM alembic_version")
-                ) == "0002_image_calibration"
+                ) == "0003_annotation_withdrawal"
                 wing_columns = {
                     column["name"] for column in inspect(engine).get_columns("wing_images")
                 }

@@ -22,11 +22,14 @@ cross-template morphometric comparison.
 4. The student calibrates image scale from a visible reference length, such as
    a 1 mm scale bar, then places the template's numbered landmarks with the
    zoomed digitization view.
-5. An expert approves it or returns it with comments. Returned work is cloned
+5. If a student submits by mistake before expert review, they may withdraw the
+   submission from the review queue and create an editable replacement revision;
+   the withdrawn coordinate set remains preserved.
+6. An expert approves it or returns it with comments. Returned work is cloned
    into a new editable revision; the reviewed coordinates remain preserved.
-6. Approval atomically creates a permanent accession such as
+7. Approval atomically creates a permanent accession such as
    `WBR-HYM-APIS-000001`.
-7. Repository and export pages expose approved records only. CSV and TPS export
+8. Repository and export pages expose approved records only. CSV and TPS export
    always target one exact template version.
 
 See [the architecture](docs/ARCHITECTURE.md) and

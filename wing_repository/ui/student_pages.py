@@ -25,7 +25,7 @@ from wing_repository.models import (
 from wing_repository.services import (
     attach_wing_image,
     calibrate_wing_image_scale,
-    clone_returned_annotation,
+    clone_preserved_annotation,
     create_draft_annotation,
     create_specimen,
     delete_annotation_point,
@@ -34,6 +34,7 @@ from wing_repository.services import (
     place_annotation_point,
     submit_annotation,
     undo_last_point,
+    withdraw_submitted_annotation,
 )
 from wing_repository.ui.common import (
     annotation_dataframe,
@@ -94,12 +95,13 @@ def render_student_dashboard(session: Session, user: User) -> None:
             .group_by(Annotation.status)
         ).all()
     )
-    columns = st.columns(4)
+    columns = st.columns(5)
     for column, status in zip(
         columns,
         (
             AnnotationStatus.DRAFT,
             AnnotationStatus.SUBMITTED,
+            AnnotationStatus.WITHDRAWN,
             AnnotationStatus.RETURNED,
             AnnotationStatus.APPROVED,
         ),
@@ -111,9 +113,11 @@ def render_student_dashboard(session: Session, user: User) -> None:
     st.markdown(
         "1. Complete the specimen metadata form.\n"
         "2. Upload the specimen's original right-forewing PNG or JPEG.\n"
-        "3. Place every landmark in the displayed template order.\n"
+        "3. Calibrate scale and place every landmark in the displayed template order.\n"
         "4. Submit the complete coordinate set for expert review.\n"
-        "5. If returned, create a new revision; the reviewed revision stays preserved."
+        "5. If you submitted by mistake before review, withdraw it and create "
+        "a replacement revision.\n"
+        "6. If returned, create a new revision; the reviewed revision stays preserved."
     )
 
 
@@ -734,15 +738,29 @@ def render_submissions(session: Session, user: User) -> None:
         if st.button("Resume this draft", type="primary"):
             st.session_state["wbr_selected_annotation_id"] = selected.id
             move_to_page("Manual landmark digitization")
-    elif selected.status is AnnotationStatus.RETURNED:
-        if st.button("Create editable revision", type="primary"):
-            revision = clone_returned_annotation(
+    elif selected.status in {AnnotationStatus.RETURNED, AnnotationStatus.WITHDRAWN}:
+        if selected.status is AnnotationStatus.RETURNED:
+            st.caption("This returned revision is preserved; edit a replacement copy.")
+        else:
+            st.caption(
+                "This withdrawn submission is preserved and no longer appears "
+                "in the expert review queue."
+            )
+        if st.button("Create editable replacement", type="primary"):
+            revision = clone_preserved_annotation(
                 session, user, annotation_id=selected.id
             )
             st.session_state["wbr_selected_annotation_id"] = revision.id
             move_to_page("Manual landmark digitization")
     elif selected.status is AnnotationStatus.SUBMITTED:
-        st.caption("This submitted revision is immutable while awaiting review.")
+        st.caption(
+            "This submitted revision is immutable while awaiting review. If it "
+            "was submitted by mistake and has not been reviewed, you may withdraw it."
+        )
+        if st.button("Withdraw from expert review", type="primary"):
+            withdraw_submitted_annotation(session, user, annotation_id=selected.id)
+            st.toast("Submission withdrawn; the preserved copy left the review queue.")
+            st.rerun()
     else:
         st.caption("This approved revision and its accession are permanent.")
 

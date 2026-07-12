@@ -1014,6 +1014,99 @@ def clone_returned_annotation(
     return revision
 
 
+def clone_preserved_annotation(
+    session: Session,
+    actor: User,
+    *,
+    annotation_id: int,
+) -> Annotation:
+    """Clone a preserved returned/withdrawn revision into a new editable draft."""
+
+    require_active_role(actor, Role.STUDENT)
+    source = session.get(Annotation, annotation_id)
+    if source is None:
+        raise NotFoundError("Preserved annotation was not found.")
+    if source.contributor_id != actor.id:
+        raise AuthorizationError("That annotation does not belong to this contributor.")
+    if source.status not in {AnnotationStatus.RETURNED, AnnotationStatus.WITHDRAWN}:
+        raise InvalidStateError(
+            "Only a returned or withdrawn annotation can be copied into a new draft."
+        )
+    _validate_annotation_links(source)
+    assignment = source.wing_image.specimen.assignment
+    if not assignment.is_active or assignment.student_id != actor.id:
+        raise InvalidStateError("The specimen's assignment is no longer active.")
+    existing_child = session.scalar(
+        select(Annotation).where(Annotation.parent_annotation_id == source.id)
+    )
+    if existing_child is not None:
+        if existing_child.status is AnnotationStatus.DRAFT:
+            return existing_child
+        raise InvalidStateError("A replacement revision has already been created.")
+
+    _reload_annotation_points(session, source)
+
+    replacement = Annotation(
+        wing_image_id=source.wing_image_id,
+        template_id=source.template_id,
+        contributor_id=source.contributor_id,
+        parent_annotation_id=source.id,
+        revision_number=source.revision_number + 1,
+        status=AnnotationStatus.DRAFT,
+        image_width=source.image_width,
+        image_height=source.image_height,
+    )
+    source_id = source.id
+    try:
+        session.add(replacement)
+        session.flush()
+        for source_point in source.points:
+            session.add(
+                AnnotationPoint(
+                    annotation_id=replacement.id,
+                    template_landmark_id=source_point.template_landmark_id,
+                    x_pixel=source_point.x_pixel,
+                    y_pixel=source_point.y_pixel,
+                    x_normalized=source_point.x_normalized,
+                    y_normalized=source_point.y_normalized,
+                )
+            )
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        existing = session.scalar(
+            select(Annotation).where(Annotation.parent_annotation_id == source_id)
+        )
+        if existing is not None:
+            return existing
+        raise ConflictError("A replacement revision could not be created.") from exc
+    return replacement
+
+
+def withdraw_submitted_annotation(
+    session: Session,
+    actor: User,
+    *,
+    annotation_id: int,
+) -> Annotation:
+    """Remove a mistaken submission from review while preserving its data."""
+
+    require_active_role(actor, Role.STUDENT)
+    annotation = session.get(Annotation, annotation_id)
+    if annotation is None:
+        raise NotFoundError("Submitted annotation was not found.")
+    if annotation.contributor_id != actor.id:
+        raise AuthorizationError("That annotation does not belong to this contributor.")
+    _validate_annotation_links(annotation)
+    if annotation.status is not AnnotationStatus.SUBMITTED:
+        raise InvalidStateError("Only an awaiting-review submission can be withdrawn.")
+    if annotation.review is not None or annotation.repository_record is not None:
+        raise InvalidStateError("A reviewed annotation cannot be withdrawn.")
+    annotation.status = AnnotationStatus.WITHDRAWN
+    session.commit()
+    return annotation
+
+
 def _reviewable_annotation(
     session: Session,
     actor: User,
@@ -1199,6 +1292,7 @@ __all__ = [
     "attach_wing_image",
     "authenticate_user",
     "calibrate_wing_image_scale",
+    "clone_preserved_annotation",
     "clone_returned_annotation",
     "create_assignment",
     "create_draft_annotation",
@@ -1219,4 +1313,5 @@ __all__ = [
     "submit_annotation",
     "undo_last_point",
     "validate_annotation_complete",
+    "withdraw_submitted_annotation",
 ]

@@ -89,16 +89,21 @@ page is not considered a security boundary.
 stateDiagram-v2
     [*] --> DRAFT
     DRAFT --> SUBMITTED: complete point set
+    SUBMITTED --> WITHDRAWN: contributor withdraws before review
     SUBMITTED --> APPROVED: expert approval + accession
     SUBMITTED --> RETURNED: expert requests changes
     RETURNED --> DRAFT: clone as next revision
+    WITHDRAWN --> DRAFT: clone as replacement revision
     APPROVED --> [*]
 ```
 
 A draft can be edited freely. Submission requires exactly one point for every
 ordered template landmark. Once submitted, its point rows are immutable. A
-returned annotation remains preserved and is cloned into a new draft revision;
-the student edits the clone. An approved revision is terminal and append-only.
+student may withdraw a submitted annotation before any expert review decision;
+the withdrawn revision remains preserved and is cloned into a new draft
+replacement. A returned annotation also remains preserved and is cloned into a
+new draft revision; the student edits the clone. An approved revision is
+terminal and append-only.
 
 Template identity is carried by foreign key throughout the workflow and is
 included in exports. The application never merges, compares, averages, or

@@ -35,6 +35,7 @@ class TemplateStatus(StringEnum):
 class AnnotationStatus(StringEnum):
     DRAFT = "draft"
     SUBMITTED = "submitted"
+    WITHDRAWN = "withdrawn"
     RETURNED = "returned"
     APPROVED = "approved"
 
