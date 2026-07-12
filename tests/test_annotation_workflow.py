@@ -206,6 +206,121 @@ def test_scale_calibration_rejects_unowned_or_submitted_images(
         )
 
 
+def test_scale_calibration_allows_unreviewed_withdrawn_or_deleted_history(
+    db_session: Session,
+    student: User,
+    reviewer: User,
+    assignment: Assignment,
+    landmark_template: LandmarkTemplate,
+    image_store: LocalImageStore,
+    image_bytes: bytes,
+) -> None:
+    withdrawn_image = _uploaded_image(
+        db_session,
+        student,
+        assignment,
+        image_store,
+        image_bytes,
+        specimen_code="APIS-CALIBRATION-WITHDRAWN",
+    )
+    submitted = submit_annotation(
+        db_session,
+        student,
+        annotation_id=_complete_draft(
+            db_session,
+            student,
+            withdrawn_image,
+            landmark_template,
+        ).id,
+    )
+    withdrawn = withdraw_submitted_annotation(
+        db_session,
+        student,
+        annotation_id=submitted.id,
+    )
+    replacement = clone_preserved_annotation(
+        db_session,
+        student,
+        annotation_id=withdrawn.id,
+    )
+
+    calibrated = calibrate_wing_image_scale(
+        db_session,
+        student,
+        wing_image_id=withdrawn_image.id,
+        reference_length=1.0,
+        reference_unit="millimeters",
+        x1_pixel=10,
+        y1_pixel=10,
+        x2_pixel=60,
+        y2_pixel=10,
+    )
+    resubmitted = submit_annotation(
+        db_session,
+        student,
+        annotation_id=replacement.id,
+    )
+
+    assert calibrated.scale_reference_pixels == pytest.approx(50.0)
+    assert calibrated.scale_mm_per_pixel == pytest.approx(0.02)
+    assert resubmitted in list_submitted_annotations(db_session, reviewer)
+
+    deleted_image = _uploaded_image(
+        db_session,
+        student,
+        assignment,
+        image_store,
+        image_bytes,
+        specimen_code="APIS-CALIBRATION-DELETED",
+    )
+    submitted_to_delete = submit_annotation(
+        db_session,
+        student,
+        annotation_id=_complete_draft(
+            db_session,
+            student,
+            deleted_image,
+            landmark_template,
+        ).id,
+    )
+    withdrawn_to_delete = withdraw_submitted_annotation(
+        db_session,
+        student,
+        annotation_id=submitted_to_delete.id,
+    )
+    replacement_after_delete = clone_preserved_annotation(
+        db_session,
+        student,
+        annotation_id=withdrawn_to_delete.id,
+    )
+    delete_withdrawn_annotation(
+        db_session,
+        student,
+        annotation_id=withdrawn_to_delete.id,
+    )
+
+    calibrated_after_delete = calibrate_wing_image_scale(
+        db_session,
+        student,
+        wing_image_id=deleted_image.id,
+        reference_length=1.0,
+        reference_unit="millimeters",
+        x1_pixel=20,
+        y1_pixel=10,
+        x2_pixel=70,
+        y2_pixel=10,
+    )
+    resubmitted_after_delete = submit_annotation(
+        db_session,
+        student,
+        annotation_id=replacement_after_delete.id,
+    )
+
+    assert calibrated_after_delete.scale_reference_pixels == pytest.approx(50.0)
+    assert calibrated_after_delete.scale_mm_per_pixel == pytest.approx(0.02)
+    assert resubmitted_after_delete in list_submitted_annotations(db_session, reviewer)
+
+
 def test_undo_and_delete_affect_only_editable_draft_points(
     db_session: Session,
     student: User,

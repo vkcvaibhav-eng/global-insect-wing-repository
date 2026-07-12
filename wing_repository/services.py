@@ -72,6 +72,11 @@ LENGTH_UNIT_TO_MM = {
     "inch": 25.4,
     "inches": 25.4,
 }
+SCALE_CALIBRATION_EDITABLE_ANNOTATION_STATUSES = {
+    AnnotationStatus.DRAFT,
+    AnnotationStatus.WITHDRAWN,
+    AnnotationStatus.DELETED,
+}
 
 
 def _utc_now() -> datetime:
@@ -580,11 +585,14 @@ def calibrate_wing_image_scale(
     ):
         raise AuthorizationError("That wing image does not belong to this contributor.")
     if any(
-        annotation.status is not AnnotationStatus.DRAFT
+        annotation.status not in SCALE_CALIBRATION_EDITABLE_ANNOTATION_STATUSES
+        or annotation.review is not None
+        or annotation.repository_record is not None
         for annotation in wing_image.annotations
     ):
         raise InvalidStateError(
-            "Scale calibration cannot be changed after an annotation is submitted."
+            "Scale calibration cannot be changed after an annotation is awaiting "
+            "review or has been reviewed."
         )
 
     endpoint_1 = normalize_coordinates(
