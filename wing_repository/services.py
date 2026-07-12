@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 import math
+from pathlib import Path
 from typing import Iterable
 
 from sqlalchemy import Select, select
@@ -49,9 +50,13 @@ from .models import (
     WingImage,
 )
 from .security import hash_password, normalize_email, verify_password
+from .template_loader import create_template, load_template_definition
 
 
 MIN_ACCOUNT_PASSWORD_CHARACTERS = 12
+BUNDLED_SAMPLE_TEMPLATE_PATH = (
+    Path(__file__).resolve().parents[1] / "demo_data" / "templates" / "apis_v1.json"
+)
 
 
 def _utc_now() -> datetime:
@@ -214,6 +219,16 @@ def create_user_account(
         session.rollback()
         raise ConflictError("An active or inactive account already uses that email.") from exc
     return user
+
+
+def import_bundled_sample_template(session: Session, actor: User) -> LandmarkTemplate:
+    """Import the bundled Apis v1 template so assignments can be created."""
+
+    require_active_role(actor, Role.ADMINISTRATOR)
+    definition = load_template_definition(BUNDLED_SAMPLE_TEMPLATE_PATH)
+    template = create_template(session, definition, created_by=actor)
+    session.commit()
+    return template
 
 
 def get_active_assignment(
@@ -1089,6 +1104,7 @@ __all__ = [
     "deactivate_assignment",
     "delete_annotation_point",
     "get_active_assignment",
+    "import_bundled_sample_template",
     "list_repository_records",
     "list_student_annotations",
     "list_submitted_annotations",

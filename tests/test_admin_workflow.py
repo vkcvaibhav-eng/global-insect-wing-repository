@@ -1,22 +1,23 @@
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from wing_repository.enums import Role
+from wing_repository.enums import Role, TemplateStatus
 from wing_repository.errors import (
     AuthenticationError,
     AuthorizationError,
     ConflictError,
     ValidationError,
 )
-from wing_repository.models import User
+from wing_repository.models import LandmarkTemplate, User
 from wing_repository.security import verify_password
 from wing_repository.services import (
     approve_user_account,
     authenticate_user,
     create_user_account,
+    import_bundled_sample_template,
     request_student_signup,
 )
 
@@ -105,6 +106,29 @@ def test_student_signup_email_must_be_unique(db_session: Session) -> None:
             full_name="Duplicate Signup Again",
             password="signup-password-2027",
         )
+
+
+def test_administrator_can_import_bundled_sample_template(
+    db_session: Session,
+    administrator: User,
+) -> None:
+    created = import_bundled_sample_template(db_session, administrator)
+    same = import_bundled_sample_template(db_session, administrator)
+
+    assert same.id == created.id
+    assert created.status is TemplateStatus.PUBLISHED
+    assert created.taxon.genus == "Apis"
+    assert created.taxon.genus_code == "APIS"
+    assert len(created.landmarks) == 10
+    assert db_session.scalar(select(func.count()).select_from(LandmarkTemplate)) == 1
+
+
+def test_non_administrator_cannot_import_bundled_sample_template(
+    db_session: Session,
+    student: User,
+) -> None:
+    with pytest.raises(AuthorizationError):
+        import_bundled_sample_template(db_session, student)
 
 
 def test_administrator_can_create_student_account(

@@ -85,6 +85,11 @@ using an email address such as a Gmail address. Version 0.1 does not implement
 Google OAuth or email verification; administrator approval is required before
 the new account can sign in.
 
+If a newly provisioned hosted database has no published landmark templates, the
+administrator page offers a **Load bundled Apis v1 template** action. This
+imports the sample `demo_data/templates/apis_v1.json` template so approved
+students can be assigned without shell access to the hosted database.
+
 ## Run
 
 From the repository root:
