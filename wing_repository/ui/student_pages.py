@@ -676,11 +676,8 @@ def render_digitization(session: Session, user: User) -> None:
     if guide is None:
         event = _render_annotation_digitizer(annotation, int(zoom_percent))
     else:
-        guide_column, digitizer_column = st.columns((1, 2))
-        with guide_column:
-            _render_template_reference_guide(guide)
-        with digitizer_column:
-            event = _render_annotation_digitizer(annotation, int(zoom_percent))
+        _render_template_reference_guide(guide)
+        event = _render_annotation_digitizer(annotation, int(zoom_percent))
     if event is not None:
         token = click_event_token(event)
         token_key = f"wbr_last_click_{annotation.id}"
