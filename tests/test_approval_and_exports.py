@@ -29,6 +29,7 @@ from wing_repository.models import (
 )
 from wing_repository.services import (
     approve_annotation,
+    calibrate_wing_image_scale,
     create_draft_annotation,
     create_specimen_with_image,
     place_annotation_point,
@@ -50,6 +51,7 @@ def _submitted_annotation(
     *,
     specimen_code: str,
     filename: str = "wing.png",
+    calibrate: bool = False,
 ) -> Annotation:
     _specimen, image = create_specimen_with_image(
         session,
@@ -60,6 +62,18 @@ def _submitted_annotation(
         original_filename=filename,
         assignment_id=assignment.id,
     )
+    if calibrate:
+        calibrate_wing_image_scale(
+            session,
+            student,
+            wing_image_id=image.id,
+            reference_length=1.0,
+            reference_unit="millimeters",
+            x1_pixel=0,
+            y1_pixel=0,
+            x2_pixel=50,
+            y2_pixel=0,
+        )
     annotation = create_draft_annotation(session, student, wing_image_id=image.id)
     for landmark, (x, y) in zip(template.landmarks, POINTS, strict=True):
         place_annotation_point(
@@ -315,6 +329,9 @@ def test_csv_and_tps_are_approved_only_ordered_and_exact_template(
     assert [float(row["y_pixel"]) for row in rows] == [5.0, 10.25, 15.0]
     assert [float(row["x_normalized"]) for row in rows] == [0.1, 0.205, 0.3]
     assert [float(row["y_normalized"]) for row in rows] == [0.1, 0.205, 0.3]
+    assert {row["mm_per_pixel"] for row in rows} == {""}
+    assert {row["x_mm"] for row in rows} == {""}
+    assert {row["y_mm"] for row in rows} == {""}
     assert {row["template_id"] for row in rows} == {str(landmark_template.id)}
     assert {row["template_version"] for row in rows} == {"1"}
     assert {row["specimen_code"] for row in rows} == {"APIS,APPROVED"}
@@ -358,6 +375,50 @@ def test_csv_and_tps_are_approved_only_ordered_and_exact_template(
     assert list(csv.DictReader(StringIO(incompatible_csv))) == []
     assert record.accession_number not in incompatible_csv
     assert export_approved_tps(db_session, template_id=incompatible.id) == ""
+
+
+def test_csv_export_includes_calibrated_millimeter_coordinates(
+    db_session: Session,
+    student: User,
+    reviewer: User,
+    assignment: Assignment,
+    landmark_template: LandmarkTemplate,
+    image_store: LocalImageStore,
+    image_bytes: bytes,
+) -> None:
+    approved = _submitted_annotation(
+        db_session,
+        student,
+        assignment,
+        landmark_template,
+        image_store,
+        image_bytes,
+        specimen_code="APIS-CALIBRATED",
+        calibrate=True,
+    )
+    record = approve_annotation(db_session, reviewer, annotation_id=approved.id)
+
+    rows = list(
+        csv.DictReader(
+            StringIO(export_approved_csv(db_session, template_id=landmark_template.id))
+        )
+    )
+
+    assert len(rows) == 3
+    assert {row["accession_number"] for row in rows} == {record.accession_number}
+    assert {float(row["scale_reference_length"]) for row in rows} == {1.0}
+    assert {row["scale_reference_unit"] for row in rows} == {"millimeters"}
+    assert {float(row["scale_reference_pixels"]) for row in rows} == {50.0}
+    assert [float(row["mm_per_pixel"]) for row in rows] == pytest.approx(
+        [0.02, 0.02, 0.02]
+    )
+    assert [float(row["x_mm"]) for row in rows] == pytest.approx([0.2, 0.41, 0.6])
+    assert [float(row["y_mm"]) for row in rows] == pytest.approx([0.1, 0.205, 0.3])
+
+    assert "scale_mm_per_pixel:0.02" in export_approved_tps(
+        db_session,
+        template_id=landmark_template.id,
+    )
 
 
 def test_export_revalidates_approved_coordinate_integrity(

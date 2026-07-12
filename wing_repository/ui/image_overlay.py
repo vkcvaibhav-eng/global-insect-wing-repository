@@ -34,6 +34,7 @@ def build_numbered_overlay(
     expected_width: int,
     expected_height: int,
     max_display_width: int = 1_100,
+    allow_upscale: bool = False,
 ) -> Image.Image:
     """Return a resized RGB proxy with numbered landmark markers.
 
@@ -56,7 +57,10 @@ def build_numbered_overlay(
     except (UnidentifiedImageError, OSError) as exc:
         raise OverlayError("The stored original image cannot be decoded.") from exc
 
-    if proxy.width > max_display_width:
+    should_resize = proxy.width > max_display_width or (
+        allow_upscale and proxy.width != max_display_width
+    )
+    if should_resize:
         display_height = max(1, round(proxy.height * max_display_width / proxy.width))
         proxy = proxy.resize(
             (max_display_width, display_height),

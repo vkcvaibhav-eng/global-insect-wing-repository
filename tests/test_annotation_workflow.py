@@ -24,6 +24,7 @@ from wing_repository.models import (
     WingImage,
 )
 from wing_repository.services import (
+    calibrate_wing_image_scale,
     clone_returned_annotation,
     create_draft_annotation,
     create_specimen_with_image,
@@ -128,6 +129,76 @@ def test_point_crud_saves_pixel_and_normalized_coordinates(
     )
     assert replaced.id == point.id
     assert (replaced.x_pixel, replaced.y_pixel) == (11, 6)
+
+
+def test_student_can_calibrate_image_scale_from_known_reference(
+    db_session: Session,
+    student: User,
+    assignment: Assignment,
+    image_store: LocalImageStore,
+    image_bytes: bytes,
+) -> None:
+    image = _uploaded_image(db_session, student, assignment, image_store, image_bytes)
+
+    calibrated = calibrate_wing_image_scale(
+        db_session,
+        student,
+        wing_image_id=image.id,
+        reference_length=1.0,
+        reference_unit="millimeters",
+        x1_pixel=10,
+        y1_pixel=10,
+        x2_pixel=60,
+        y2_pixel=10,
+    )
+
+    assert calibrated.scale_reference_length == 1.0
+    assert calibrated.scale_reference_unit == "millimeters"
+    assert calibrated.scale_reference_pixels == pytest.approx(50.0)
+    assert calibrated.scale_mm_per_pixel == pytest.approx(0.02)
+    assert calibrated.scale_x1_pixel == pytest.approx(10)
+    assert calibrated.scale_x2_pixel == pytest.approx(60)
+
+
+def test_scale_calibration_rejects_unowned_or_submitted_images(
+    db_session: Session,
+    student: User,
+    second_student: User,
+    assignment: Assignment,
+    landmark_template: LandmarkTemplate,
+    image_store: LocalImageStore,
+    image_bytes: bytes,
+) -> None:
+    image = _uploaded_image(db_session, student, assignment, image_store, image_bytes)
+
+    with pytest.raises(AuthorizationError):
+        calibrate_wing_image_scale(
+            db_session,
+            second_student,
+            wing_image_id=image.id,
+            reference_length=1.0,
+            reference_unit="millimeters",
+            x1_pixel=10,
+            y1_pixel=10,
+            x2_pixel=60,
+            y2_pixel=10,
+        )
+
+    draft = _complete_draft(db_session, student, image, landmark_template)
+    submit_annotation(db_session, student, annotation_id=draft.id)
+
+    with pytest.raises(InvalidStateError):
+        calibrate_wing_image_scale(
+            db_session,
+            student,
+            wing_image_id=image.id,
+            reference_length=1.0,
+            reference_unit="millimeters",
+            x1_pixel=10,
+            y1_pixel=10,
+            x2_pixel=60,
+            y2_pixel=10,
+        )
 
 
 def test_undo_and_delete_affect_only_editable_draft_points(

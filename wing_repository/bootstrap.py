@@ -50,14 +50,20 @@ def ensure_database_ready(
         _prepare_demo_storage(active_settings)
     if inspect(app_engine).has_table("users"):
         if active_settings.auto_bootstrap_demo and active_settings.demo_reset_passwords:
-            from scripts.seed_demo import seed_demo_accounts
-
             with _bootstrap_lock:
+                alembic_config = Config(str(PROJECT_ROOT / "alembic.ini"))
+                command.upgrade(alembic_config, "head")
+                from scripts.seed_demo import seed_demo_accounts
+
                 with session_factory() as session:
                     seed_demo_accounts(
                         session,
                         reset_passwords=active_settings.demo_reset_passwords,
                     )
+        elif active_settings.auto_bootstrap_demo:
+            with _bootstrap_lock:
+                alembic_config = Config(str(PROJECT_ROOT / "alembic.ini"))
+                command.upgrade(alembic_config, "head")
         return True
     if not active_settings.auto_bootstrap_demo:
         return False

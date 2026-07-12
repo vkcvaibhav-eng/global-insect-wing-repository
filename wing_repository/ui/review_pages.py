@@ -14,6 +14,7 @@ from wing_repository.services import (
 from wing_repository.ui.common import (
     annotation_dataframe,
     annotation_overlay,
+    format_image_scale,
     format_template,
 )
 
@@ -77,6 +78,7 @@ def render_expert_review(session: Session, user: User) -> None:
             f"{specimen.voucher_code or 'Not supplied'}"
         )
         st.write(f"**Image SHA-256:** `{annotation.wing_image.sha256}`")
+        st.write(f"**Image scale:** {format_image_scale(annotation.wing_image)}")
         st.write(f"**Submitted:** {annotation.submitted_at}")
 
     st.subheader("Preserved coordinates")
@@ -93,6 +95,8 @@ def render_expert_review(session: Session, user: User) -> None:
             "y_normalized": st.column_config.NumberColumn(
                 "Y normalized", format="%.8f"
             ),
+            "x_mm": st.column_config.NumberColumn("X mm", format="%.6f"),
+            "y_mm": st.column_config.NumberColumn("Y mm", format="%.6f"),
         },
     )
 

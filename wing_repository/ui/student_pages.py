@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
+import math
 
 import pandas as pd
 import streamlit as st
@@ -23,6 +24,7 @@ from wing_repository.models import (
 )
 from wing_repository.services import (
     attach_wing_image,
+    calibrate_wing_image_scale,
     clone_returned_annotation,
     create_draft_annotation,
     create_specimen,
@@ -40,6 +42,16 @@ from wing_repository.ui.common import (
     image_store,
     move_to_page,
 )
+from wing_repository.ui.image_overlay import OverlayPoint, build_numbered_overlay
+
+
+CALIBRATION_UNITS = (
+    "millimeters",
+    "centimeters",
+    "micrometers",
+    "inches",
+)
+ZOOM_PERCENTAGES = (100, 150, 200, 300, 400)
 
 
 def _optional_float(value: str, field_name: str) -> float | None:
@@ -309,11 +321,176 @@ def _create_or_open_draft(session: Session, user: User) -> None:
         st.rerun()
 
 
+def _display_width_for_zoom(source_width: int, zoom_percent: int) -> int:
+    base_width = min(max(source_width, 1), 900)
+    return max(100, min(3200, round(base_width * zoom_percent / 100)))
+
+
+def _calibration_points_key(wing_image_id: int) -> str:
+    return f"wbr_scale_points_{wing_image_id}"
+
+
+def _calibration_points(wing_image_id: int) -> list[tuple[float, float]]:
+    raw_points = st.session_state.get(_calibration_points_key(wing_image_id), [])
+    if not isinstance(raw_points, list):
+        return []
+    points: list[tuple[float, float]] = []
+    for raw_point in raw_points[:2]:
+        if (
+            isinstance(raw_point, (tuple, list))
+            and len(raw_point) == 2
+            and all(isinstance(value, (int, float)) for value in raw_point)
+        ):
+            points.append((float(raw_point[0]), float(raw_point[1])))
+    return points
+
+
+def _render_scale_calibration(
+    session: Session,
+    user: User,
+    annotation: Annotation,
+) -> None:
+    wing_image = annotation.wing_image
+    st.subheader("Image scale calibration")
+    st.caption(
+        "Click two endpoints on a visible scale bar or ruler, then enter the "
+        "known physical length. The app computes mm_per_pixel and preserves "
+        "the two endpoint coordinates."
+    )
+    if wing_image.scale_mm_per_pixel is None:
+        st.warning(
+            "No physical scale has been saved yet. Calibrate before submitting "
+            "if the landmark coordinates must be usable as measurements."
+        )
+    else:
+        st.success(
+            f"Scale saved: {wing_image.scale_mm_per_pixel:.8g} mm/pixel "
+            f"({1 / wing_image.scale_mm_per_pixel:.3f} pixels/mm)."
+        )
+        st.caption(
+            f"Reference: {wing_image.scale_reference_length:g} "
+            f"{wing_image.scale_reference_unit} = "
+            f"{wing_image.scale_reference_pixels:.3f} pixels."
+        )
+
+    calibration_points = _calibration_points(wing_image.id)
+    if (
+        not calibration_points
+        and wing_image.scale_x1_pixel is not None
+        and wing_image.scale_y1_pixel is not None
+        and wing_image.scale_x2_pixel is not None
+        and wing_image.scale_y2_pixel is not None
+    ):
+        calibration_points = [
+            (wing_image.scale_x1_pixel, wing_image.scale_y1_pixel),
+            (wing_image.scale_x2_pixel, wing_image.scale_y2_pixel),
+        ]
+        st.session_state[_calibration_points_key(wing_image.id)] = calibration_points
+
+    columns = st.columns((1, 1, 2))
+    reference_length = columns[0].number_input(
+        "Known reference length",
+        min_value=0.000001,
+        value=float(wing_image.scale_reference_length or 1.0),
+        format="%.6f",
+        key=f"scale_reference_length_{wing_image.id}",
+    )
+    default_unit = (
+        wing_image.scale_reference_unit
+        if wing_image.scale_reference_unit in CALIBRATION_UNITS
+        else "millimeters"
+    )
+    reference_unit = columns[1].selectbox(
+        "Unit",
+        CALIBRATION_UNITS,
+        index=CALIBRATION_UNITS.index(default_unit),
+        key=f"scale_reference_unit_{wing_image.id}",
+    )
+    calibration_zoom = columns[2].select_slider(
+        "Calibration image zoom",
+        options=ZOOM_PERCENTAGES,
+        value=200,
+        format_func=lambda value: f"{value}%",
+        key=f"scale_zoom_{wing_image.id}",
+    )
+
+    original = image_store().load_original(wing_image.storage_key)
+    calibration_overlay = build_numbered_overlay(
+        original,
+        [
+            OverlayPoint(ordinal=index, x_pixel=x, y_pixel=y)
+            for index, (x, y) in enumerate(calibration_points, start=1)
+        ],
+        expected_width=wing_image.image_width,
+        expected_height=wing_image.image_height,
+        max_display_width=_display_width_for_zoom(
+            wing_image.image_width,
+            int(calibration_zoom),
+        ),
+        allow_upscale=True,
+    )
+    event = streamlit_image_coordinates(
+        calibration_overlay,
+        width=calibration_overlay.width,
+        key=f"scale_digitizer_{wing_image.id}",
+    )
+    if event is not None:
+        token = click_event_token(event)
+        token_key = f"wbr_last_scale_click_{wing_image.id}"
+        if token != st.session_state.get(token_key):
+            st.session_state[token_key] = token
+            coordinate = coordinate_from_click_event(
+                event,
+                original_width=wing_image.image_width,
+                original_height=wing_image.image_height,
+            )
+            updated_points = [*calibration_points, (coordinate.x_pixel, coordinate.y_pixel)]
+            st.session_state[_calibration_points_key(wing_image.id)] = updated_points[-2:]
+            st.rerun()
+
+    if len(calibration_points) == 2:
+        measured_pixels = math.hypot(
+            calibration_points[1][0] - calibration_points[0][0],
+            calibration_points[1][1] - calibration_points[0][1],
+        )
+        st.write(f"Measured scale line: **{measured_pixels:.3f} pixels**")
+    else:
+        st.info("Click two endpoints of the scale reference line.")
+
+    actions = st.columns(2)
+    if actions[0].button("Clear scale endpoint clicks", width="stretch"):
+        st.session_state[_calibration_points_key(wing_image.id)] = []
+        st.rerun()
+    if actions[1].button(
+        "Save scale calibration",
+        type="primary",
+        disabled=len(calibration_points) != 2,
+        width="stretch",
+    ):
+        if len(calibration_points) != 2:
+            st.warning("Click two scale endpoints first.")
+            return
+        calibrate_wing_image_scale(
+            session,
+            user,
+            wing_image_id=wing_image.id,
+            reference_length=reference_length,
+            reference_unit=reference_unit,
+            x1_pixel=calibration_points[0][0],
+            y1_pixel=calibration_points[0][1],
+            x2_pixel=calibration_points[1][0],
+            y2_pixel=calibration_points[1][1],
+        )
+        st.toast("Scale calibration saved.")
+        st.rerun()
+
+
 def render_digitization(session: Session, user: User) -> None:
     st.title("Manual landmark digitization")
-    st.warning(
-        "Use the current wide view for placement. Fine zoom, pan, and direct "
-        "dragging require the planned custom TypeScript digitizer component."
+    st.info(
+        "Calibrate image scale from a known reference length, then place "
+        "landmarks. Dragging and pan-like tpsDig controls still require the "
+        "planned custom TypeScript digitizer component."
     )
     drafts = _draft_annotations(session, user)
     if not drafts:
@@ -339,6 +516,8 @@ def render_digitization(session: Session, user: User) -> None:
     annotation = drafts_by_id[selected_annotation_id]
     st.session_state["wbr_selected_annotation_id"] = annotation.id
 
+    _render_scale_calibration(session, user, annotation)
+
     landmarks = sorted(annotation.template.landmarks, key=lambda item: item.ordinal)
     placed_by_landmark = {
         point.template_landmark_id: point for point in annotation.points
@@ -363,7 +542,25 @@ def render_digitization(session: Session, user: User) -> None:
     else:
         st.success("The exact template point set is complete and ready to submit.")
 
-    overlay = annotation_overlay(annotation)
+    zoom_percent = st.select_slider(
+        "Landmark placement zoom",
+        options=ZOOM_PERCENTAGES,
+        value=200,
+        format_func=lambda value: f"{value}%",
+        key=f"landmark_zoom_{annotation.id}",
+    )
+    st.caption(
+        "Higher zoom displays a larger image while clicks are still saved in "
+        "the original image pixel coordinate system."
+    )
+    overlay = annotation_overlay(
+        annotation,
+        max_display_width=_display_width_for_zoom(
+            annotation.image_width,
+            int(zoom_percent),
+        ),
+        allow_upscale=True,
+    )
     event = streamlit_image_coordinates(
         overlay,
         width=overlay.width,
@@ -440,12 +637,20 @@ def render_digitization(session: Session, user: User) -> None:
         if st.button(
             "Submit for review",
             type="primary",
-            disabled=len(annotation.points) != len(landmarks),
+            disabled=(
+                len(annotation.points) != len(landmarks)
+                or annotation.wing_image.scale_mm_per_pixel is None
+            ),
             width="stretch",
         ):
             submit_annotation(session, user, annotation_id=annotation.id)
             st.toast("Annotation submitted for expert review.")
             move_to_page("My submissions")
+    if (
+        len(annotation.points) == len(landmarks)
+        and annotation.wing_image.scale_mm_per_pixel is None
+    ):
+        st.warning("Save image scale calibration before submitting for review.")
 
     table = annotation_dataframe(annotation)
     st.dataframe(
@@ -455,7 +660,10 @@ def render_digitization(session: Session, user: User) -> None:
                 "y_pixel": "{:.3f}",
                 "x_normalized": "{:.8f}",
                 "y_normalized": "{:.8f}",
-            }
+                "x_mm": "{:.6f}",
+                "y_mm": "{:.6f}",
+            },
+            na_rep="",
         ),
         width="stretch",
         hide_index=True,

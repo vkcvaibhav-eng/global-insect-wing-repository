@@ -45,7 +45,21 @@ def test_alembic_upgrades_an_empty_sqlite_database_to_head(
             with engine.connect() as connection:
                 assert connection.scalar(
                     text("SELECT version_num FROM alembic_version")
-                ) == "0001_initial"
+                ) == "0002_image_calibration"
+                wing_columns = {
+                    column["name"] for column in inspect(engine).get_columns("wing_images")
+                }
+                assert {
+                    "scale_reference_length",
+                    "scale_reference_unit",
+                    "scale_reference_pixels",
+                    "scale_mm_per_pixel",
+                    "scale_x1_pixel",
+                    "scale_y1_pixel",
+                    "scale_x2_pixel",
+                    "scale_y2_pixel",
+                    "scale_calibrated_at",
+                } <= wing_columns
         finally:
             engine.dispose()
     finally:

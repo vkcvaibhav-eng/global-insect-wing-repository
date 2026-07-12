@@ -382,6 +382,18 @@ class WingImage(Base):
         CheckConstraint("image_height > 0", name="height_positive"),
         CheckConstraint("length(sha256) = 64", name="sha256_length"),
         CheckConstraint("length(trim(original_filename)) >= 1", name="filename_nonempty"),
+        CheckConstraint(
+            "scale_reference_length IS NULL OR scale_reference_length > 0",
+            name="scale_reference_length_positive",
+        ),
+        CheckConstraint(
+            "scale_reference_pixels IS NULL OR scale_reference_pixels > 0",
+            name="scale_reference_pixels_positive",
+        ),
+        CheckConstraint(
+            "scale_mm_per_pixel IS NULL OR scale_mm_per_pixel > 0",
+            name="scale_mm_per_pixel_positive",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -410,6 +422,17 @@ class WingImage(Base):
     byte_size: Mapped[int] = mapped_column(BigInteger, nullable=False)
     image_width: Mapped[int] = mapped_column(Integer, nullable=False)
     image_height: Mapped[int] = mapped_column(Integer, nullable=False)
+    scale_reference_length: Mapped[float | None] = mapped_column(Float)
+    scale_reference_unit: Mapped[str | None] = mapped_column(String(32))
+    scale_reference_pixels: Mapped[float | None] = mapped_column(Float)
+    scale_mm_per_pixel: Mapped[float | None] = mapped_column(Float)
+    scale_x1_pixel: Mapped[float | None] = mapped_column(Float)
+    scale_y1_pixel: Mapped[float | None] = mapped_column(Float)
+    scale_x2_pixel: Mapped[float | None] = mapped_column(Float)
+    scale_y2_pixel: Mapped[float | None] = mapped_column(Float)
+    scale_calibrated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
     uploaded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now, server_default=func.now()
     )

@@ -45,6 +45,12 @@ CSV_COLUMNS = (
     "y_pixel",
     "x_normalized",
     "y_normalized",
+    "scale_reference_length",
+    "scale_reference_unit",
+    "scale_reference_pixels",
+    "mm_per_pixel",
+    "x_mm",
+    "y_mm",
 )
 
 
@@ -121,6 +127,7 @@ def export_approved_csv(session: Session, *, template_id: int) -> str:
         image = annotation.wing_image
         specimen = image.specimen
         taxon = record.taxon
+        mm_per_pixel = image.scale_mm_per_pixel
         for landmark, point in _ordered_points(annotation, template):
             writer.writerow(
                 {
@@ -144,6 +151,20 @@ def export_approved_csv(session: Session, *, template_id: int) -> str:
                     "y_pixel": point.y_pixel,
                     "x_normalized": point.x_normalized,
                     "y_normalized": point.y_normalized,
+                    "scale_reference_length": image.scale_reference_length,
+                    "scale_reference_unit": image.scale_reference_unit,
+                    "scale_reference_pixels": image.scale_reference_pixels,
+                    "mm_per_pixel": mm_per_pixel,
+                    "x_mm": (
+                        point.x_pixel * mm_per_pixel
+                        if mm_per_pixel is not None
+                        else None
+                    ),
+                    "y_mm": (
+                        point.y_pixel * mm_per_pixel
+                        if mm_per_pixel is not None
+                        else None
+                    ),
                 }
             )
     return output.getvalue()
@@ -166,16 +187,19 @@ def export_approved_tps(session: Session, *, template_id: int) -> str:
             f"{_format_coordinate(point.x_pixel)} {_format_coordinate(point.y_pixel)}"
             for _landmark, point in ordered_points
         )
+        comment = (
+            "COMMENT="
+            f"template_id:{template.id};template_version:{template.version};"
+            f"annotation_id:{annotation.id};revision:{annotation.revision_number};"
+            "origin:top-left;y_axis:down;units:source_pixels"
+        )
+        if annotation.wing_image.scale_mm_per_pixel is not None:
+            comment += f";scale_mm_per_pixel:{annotation.wing_image.scale_mm_per_pixel:.12g}"
         lines.extend(
             [
                 f"ID={record.accession_number}",
                 f"IMAGE={annotation.wing_image.original_filename}",
-                (
-                    "COMMENT="
-                    f"template_id:{template.id};template_version:{template.version};"
-                    f"annotation_id:{annotation.id};revision:{annotation.revision_number};"
-                    "origin:top-left;y_axis:down;units:source_pixels"
-                ),
+                comment,
             ]
         )
         blocks.append("\n".join(lines))

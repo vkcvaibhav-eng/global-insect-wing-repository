@@ -57,6 +57,21 @@ MIN_ACCOUNT_PASSWORD_CHARACTERS = 12
 BUNDLED_SAMPLE_TEMPLATE_PATH = (
     Path(__file__).resolve().parents[1] / "demo_data" / "templates" / "apis_v1.json"
 )
+LENGTH_UNIT_TO_MM = {
+    "mm": 1.0,
+    "millimeter": 1.0,
+    "millimeters": 1.0,
+    "cm": 10.0,
+    "centimeter": 10.0,
+    "centimeters": 10.0,
+    "um": 0.001,
+    "µm": 0.001,
+    "micrometer": 0.001,
+    "micrometers": 0.001,
+    "in": 25.4,
+    "inch": 25.4,
+    "inches": 25.4,
+}
 
 
 def _utc_now() -> datetime:
@@ -104,6 +119,24 @@ def _optional_coordinate(
     if not math.isfinite(normalized) or not minimum <= normalized <= maximum:
         raise ValidationError(f"{field_name} must be between {minimum} and {maximum}.")
     return normalized
+
+
+def _positive_number(value: object, field_name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValidationError(f"{field_name} must be numeric.")
+    normalized = float(value)
+    if not math.isfinite(normalized) or normalized <= 0:
+        raise ValidationError(f"{field_name} must be greater than zero.")
+    return normalized
+
+
+def _length_to_millimeters(length: float, unit: str) -> tuple[float, str]:
+    normalized_length = _positive_number(length, "Reference length")
+    normalized_unit = _required_text(unit, "Reference unit", max_length=32).casefold()
+    if normalized_unit not in LENGTH_UNIT_TO_MM:
+        allowed = ", ".join(sorted(LENGTH_UNIT_TO_MM))
+        raise ValidationError(f"Reference unit must be one of: {allowed}.")
+    return normalized_length * LENGTH_UNIT_TO_MM[normalized_unit], normalized_unit
 
 
 def require_active_role(actor: User, *allowed_roles: Role) -> User:
@@ -520,6 +553,76 @@ def attach_wing_image(
         if isinstance(exc, IntegrityError):
             raise ConflictError("This specimen already has a wing image.") from exc
         raise
+    return wing_image
+
+
+def calibrate_wing_image_scale(
+    session: Session,
+    actor: User,
+    *,
+    wing_image_id: int,
+    reference_length: float,
+    reference_unit: str,
+    x1_pixel: float,
+    y1_pixel: float,
+    x2_pixel: float,
+    y2_pixel: float,
+) -> WingImage:
+    """Save an image-level physical scale from two reference endpoints."""
+
+    require_active_role(actor, Role.STUDENT)
+    wing_image = session.get(WingImage, wing_image_id)
+    if wing_image is None:
+        raise NotFoundError("Wing image was not found.")
+    if (
+        wing_image.uploaded_by_id != actor.id
+        or wing_image.specimen.contributor_id != actor.id
+    ):
+        raise AuthorizationError("That wing image does not belong to this contributor.")
+    if any(
+        annotation.status is not AnnotationStatus.DRAFT
+        for annotation in wing_image.annotations
+    ):
+        raise InvalidStateError(
+            "Scale calibration cannot be changed after an annotation is submitted."
+        )
+
+    endpoint_1 = normalize_coordinates(
+        x1_pixel,
+        y1_pixel,
+        wing_image.image_width,
+        wing_image.image_height,
+    )
+    endpoint_2 = normalize_coordinates(
+        x2_pixel,
+        y2_pixel,
+        wing_image.image_width,
+        wing_image.image_height,
+    )
+    measured_pixels = math.hypot(
+        endpoint_2.x_pixel - endpoint_1.x_pixel,
+        endpoint_2.y_pixel - endpoint_1.y_pixel,
+    )
+    if measured_pixels < 1:
+        raise ValidationError("Scale endpoints must be at least 1 pixel apart.")
+    reference_length_mm, normalized_unit = _length_to_millimeters(
+        reference_length,
+        reference_unit,
+    )
+
+    wing_image.scale_reference_length = _positive_number(
+        reference_length,
+        "Reference length",
+    )
+    wing_image.scale_reference_unit = normalized_unit
+    wing_image.scale_reference_pixels = measured_pixels
+    wing_image.scale_mm_per_pixel = reference_length_mm / measured_pixels
+    wing_image.scale_x1_pixel = endpoint_1.x_pixel
+    wing_image.scale_y1_pixel = endpoint_1.y_pixel
+    wing_image.scale_x2_pixel = endpoint_2.x_pixel
+    wing_image.scale_y2_pixel = endpoint_2.y_pixel
+    wing_image.scale_calibrated_at = _utc_now()
+    session.commit()
     return wing_image
 
 
@@ -1095,6 +1198,7 @@ __all__ = [
     "approve_user_account",
     "attach_wing_image",
     "authenticate_user",
+    "calibrate_wing_image_scale",
     "clone_returned_annotation",
     "create_assignment",
     "create_draft_annotation",

@@ -27,7 +27,11 @@ from wing_repository.models import (
     User,
     WingImage,
 )
-from wing_repository.ui.common import annotation_dataframe, annotation_overlay
+from wing_repository.ui.common import (
+    annotation_dataframe,
+    annotation_overlay,
+    format_image_scale,
+)
 
 
 def _approved_predicates() -> tuple[Any, ...]:
@@ -201,13 +205,15 @@ def _render_record_detail(record: RepositoryRecord) -> None:
         st.write(f"**Locality:** {specimen.locality or 'Not supplied'}")
         st.write(f"**Original filename:** {image.original_filename}")
         st.write(f"**Image SHA-256:** `{image.sha256}`")
+        st.write(f"**Image scale:** {format_image_scale(image)}")
         st.write(f"**Approved by:** {record.review.reviewer.full_name}")
         st.write(f"**Published:** {record.published_at}")
 
     st.markdown("#### Preserved coordinates")
     st.caption(
         "Pixel coordinates refer to the encoded original raster. Normalized "
-        "coordinates use x/image_width and y/image_height."
+        "coordinates use x/image_width and y/image_height. Millimeter columns "
+        "are derived from the saved image scale when calibrated."
     )
     coordinates = annotation_dataframe(annotation)
     st.dataframe(
@@ -224,6 +230,8 @@ def _render_record_detail(record: RepositoryRecord) -> None:
             "y_normalized": st.column_config.NumberColumn(
                 "Y normalized", format="%.8f"
             ),
+            "x_mm": st.column_config.NumberColumn("X mm", format="%.6f"),
+            "y_mm": st.column_config.NumberColumn("Y mm", format="%.6f"),
         },
     )
 
@@ -358,9 +366,10 @@ def render_export(session: Session, _user: User) -> None:
         f"{template.id}, version {template.version}."
     )
     st.caption(
-        "CSV contains accession and specimen context plus preserved pixel and "
-        "normalized coordinates. TPS contains the original-raster pixel "
-        "landmarks in template ordinal order."
+        "CSV contains accession and specimen context plus preserved pixel, "
+        "normalized, and calibrated millimeter coordinates when an image scale "
+        "is saved. TPS contains the original-raster pixel landmarks in template "
+        "ordinal order."
     )
 
     csv_text = export_approved_csv(session, template_id=template.id)

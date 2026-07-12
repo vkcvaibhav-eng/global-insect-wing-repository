@@ -3,7 +3,8 @@
 Version 0.1 is a functional, local-first Streamlit milestone for manual
 digitization and expert curation of **Hymenopteran right forewings**. It stores
 immutable original uploads, ordered landmark coordinates in original pixels and
-normalized units, version-specific reviews, and approved repository accessions.
+normalized units, optional image-level millimeter calibration, version-specific
+reviews, and approved repository accessions.
 
 This is intentionally not the complete worldwide platform. It contains no
 machine learning, WingSearch, PCA identifiers, automated landmarking, or
@@ -18,8 +19,9 @@ cross-template morphometric comparison.
 2. An administrator assigns each approved student to one genus and one exact
    landmark template version.
 3. The student records specimen metadata and uploads a right-forewing image.
-4. The student places the template's numbered landmarks and submits a complete
-   immutable annotation revision.
+4. The student calibrates image scale from a visible reference length, such as
+   a 1 mm scale bar, then places the template's numbered landmarks with the
+   zoomed digitization view.
 5. An expert approves it or returns it with comments. Returned work is cloned
    into a new editable revision; the reviewed coordinates remain preserved.
 6. Approval atomically creates a permanent accession such as
@@ -158,16 +160,18 @@ new template versions.
 
 ## Digitizer capabilities and boundary
 
-The current digitizer supports numbered sequential placement, immediate
-coordinate persistence, undo-last, explicit deletion/replacement, and a
-server-rendered landmark overlay. Every click is mapped from the component's
-actual rendered dimensions to the stored original raster dimensions.
+The current digitizer supports per-image scale calibration, selectable display
+zoom, numbered sequential placement, immediate coordinate persistence,
+undo-last, explicit deletion/replacement, and a server-rendered landmark
+overlay. Every click is mapped from the component's actual rendered dimensions
+to the stored original raster dimensions. Pixel and normalized coordinates are
+preserved; calibrated millimeter coordinates are derived when a saved image
+scale is available.
 
-Smooth zoom/pan, direct point dragging, hit-testing, keyboard nudging,
-high-resolution tiles, and touch/pen interactions require a purpose-built
+Smooth pan, direct point dragging, hit-testing, keyboard nudging,
+high-resolution tiles, and touch/pen interactions still require a purpose-built
 Streamlit TypeScript component. The required event contract and coordinate
-transform safeguards are documented in `docs/ARCHITECTURE.md`. The milestone
-does not pretend that browser-level image scaling provides scientific zoom.
+transform safeguards are documented in `docs/ARCHITECTURE.md`.
 
 ## Configuration
 

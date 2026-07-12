@@ -72,7 +72,9 @@ page is not considered a security boundary.
   and belong to the assigned taxon.
 - **Wing images** point to preserved original bytes and record their checksum,
   original raster dimensions, MIME type, and the fixed side/type
-  `RIGHT`/`FOREWING`.
+  `RIGHT`/`FOREWING`. Optional physical scale calibration is stored per image
+  as two original-pixel reference endpoints, a known reference length/unit, the
+  measured pixel distance, and the resulting `mm_per_pixel`.
 - **Annotations** point to one exact image and one exact template version.
   **Annotation points** store both source-raster pixel coordinates and the
   required normalized coordinates.
@@ -121,6 +123,20 @@ Coordinates are zero-origin floating-point pixel positions with bounds
 values are saved rather than recomputed only at export, so both submitted
 representations remain part of the preserved scientific record.
 
+Physical measurement coordinates are derived only when the image has been
+calibrated against a visible scale reference. The calibration follows the
+ImageJ/tpsDig-style convention:
+
+```text
+measured_pixels = distance_between_two_reference_endpoints
+mm_per_pixel = known_reference_length_mm / measured_pixels
+x_mm = x_pixel * mm_per_pixel
+y_mm = y_pixel * mm_per_pixel
+```
+
+The raw pixel and normalized coordinates remain authoritative and are not
+overwritten by the derived millimeter values.
+
 ## Original-image preservation
 
 Uploaded bytes are validated with Pillow, hashed with SHA-256, and written once
@@ -164,8 +180,11 @@ the single-user demonstration backend.
 
 The milestone uses a small, established Streamlit image-coordinate component
 for reliable click capture. The server creates a numbered overlay after each
-click and saves each mapped coordinate immediately. Undo-last and explicit
-point deletion are handled by ordinary Streamlit controls.
+click and saves each mapped coordinate immediately. The first implementation
+supports selectable zoom by rendering a larger display derivative while still
+mapping click events back to the immutable original raster. Scale calibration
+uses the same click-mapping path to record two reference endpoints. Undo-last
+and explicit point deletion are handled by ordinary Streamlit controls.
 
 A production-quality interaction with cursor-centered zoom, pan, hit-testing,
 drag-to-adjust, touch/pen input, keyboard shortcuts, and a continuously updated
