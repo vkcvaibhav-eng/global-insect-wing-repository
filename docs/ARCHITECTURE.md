@@ -49,7 +49,7 @@ The modules have intentionally narrow responsibilities:
 | Expert review | No | Yes | Yes |
 | Repository browser | Yes | Yes | Yes |
 | TPS and CSV export | Yes | Yes | Yes |
-| Administration summary/assignments | No | No | Yes |
+| Administration summary/users/assignments | No | No | Yes |
 
 Authorization is enforced again inside domain services; hiding a Streamlit
 page is not considered a security boundary.
@@ -63,7 +63,8 @@ page is not considered a security boundary.
 - **Landmark templates** belong to one taxon and one explicit version. Their
   ordered **template landmarks** define the required point sequence.
 - **Assignments** connect one student to one genus and an exact template
-  version. Version 0.1 permits one active assignment per student.
+  version. Administrators can create student/reviewer accounts and assign
+  unassigned students. Version 0.1 permits one active assignment per student.
 - **Specimens** contain contributor-supplied collection and voucher metadata
   and belong to the assigned taxon.
 - **Wing images** point to preserved original bytes and record their checksum,

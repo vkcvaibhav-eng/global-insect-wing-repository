@@ -48,7 +48,10 @@ from .models import (
     User,
     WingImage,
 )
-from .security import normalize_email, verify_password
+from .security import hash_password, normalize_email, verify_password
+
+
+MIN_ACCOUNT_PASSWORD_CHARACTERS = 12
 
 
 def _utc_now() -> datetime:
@@ -118,6 +121,45 @@ def authenticate_user(session: Session, email: str, password: str) -> User:
     user = session.scalar(select(User).where(User.email == normalized_email))
     if user is None or not user.is_active or not verify_password(password, user.password_hash):
         raise AuthenticationError("Invalid email or password.")
+    return user
+
+
+def create_user_account(
+    session: Session,
+    actor: User,
+    *,
+    email: str,
+    full_name: str,
+    role: Role,
+    password: str,
+) -> User:
+    """Create an active contributor or reviewer account as an administrator."""
+
+    require_active_role(actor, Role.ADMINISTRATOR)
+    if role not in {Role.STUDENT, Role.EXPERT_REVIEWER}:
+        raise ValidationError(
+            "Version 0.1 administrators can create student or reviewer accounts."
+        )
+    normalized_email = normalize_email(email)
+    normalized_name = _required_text(full_name, "Full name", max_length=200)
+    if not isinstance(password, str) or len(password) < MIN_ACCOUNT_PASSWORD_CHARACTERS:
+        raise ValidationError(
+            f"Temporary password must be at least "
+            f"{MIN_ACCOUNT_PASSWORD_CHARACTERS} characters."
+        )
+    user = User(
+        email=normalized_email,
+        full_name=normalized_name,
+        password_hash=hash_password(password),
+        role=role,
+        is_active=True,
+    )
+    session.add(user)
+    try:
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        raise ConflictError("An active or inactive account already uses that email.") from exc
     return user
 
 
@@ -989,6 +1031,7 @@ __all__ = [
     "create_draft_annotation",
     "create_specimen",
     "create_specimen_with_image",
+    "create_user_account",
     "deactivate_assignment",
     "delete_annotation_point",
     "get_active_assignment",

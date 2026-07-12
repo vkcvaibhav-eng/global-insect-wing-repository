@@ -11,8 +11,8 @@ cross-template morphometric comparison.
 
 ## Implemented workflow
 
-1. An administrator assigns a student to one genus and one exact landmark
-   template version.
+1. An administrator creates student/reviewer accounts and assigns each student
+   to one genus and one exact landmark template version.
 2. The student records specimen metadata and uploads a right-forewing image.
 3. The student places the template's numbered landmarks and submits a complete
    immutable annotation revision.

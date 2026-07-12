@@ -15,7 +15,11 @@ from wing_repository.models import (
     RepositoryRecord,
     User,
 )
-from wing_repository.services import create_assignment, deactivate_assignment
+from wing_repository.services import (
+    create_assignment,
+    create_user_account,
+    deactivate_assignment,
+)
 from wing_repository.ui.common import format_template
 
 
@@ -64,6 +68,40 @@ def render_administration(session: Session, user: User) -> None:
         ),
     )
     metrics[3].metric("Approved records", _count(session, RepositoryRecord))
+
+    st.subheader("Create user account")
+    st.caption(
+        "Create a student before assigning a genus/template. Share temporary "
+        "passwords outside the app; Version 0.1 does not send email."
+    )
+    with st.form("create_user_form", clear_on_submit=True):
+        new_full_name = st.text_input("Full name")
+        new_email = st.text_input("Email")
+        new_role = st.selectbox(
+            "Role",
+            [Role.STUDENT, Role.EXPERT_REVIEWER],
+            format_func=lambda role: role.value.replace("_", " ").title(),
+        )
+        new_password = st.text_input(
+            "Temporary password",
+            type="password",
+            help="Use at least 12 characters. The password is hashed before storage.",
+        )
+        create_user_submitted = st.form_submit_button(
+            "Create account",
+            type="primary",
+        )
+    if create_user_submitted:
+        created_user = create_user_account(
+            session,
+            user,
+            email=new_email,
+            full_name=new_full_name,
+            role=new_role,
+            password=new_password,
+        )
+        st.toast(f"Created {created_user.email}.")
+        st.rerun()
 
     students = list(
         session.scalars(
