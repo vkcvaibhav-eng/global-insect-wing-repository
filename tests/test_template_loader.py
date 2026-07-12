@@ -18,10 +18,7 @@ from wing_repository.template_loader import (
 )
 
 
-SAMPLE_TEMPLATE = (
-    Path(__file__).resolve().parents[1] / "demo_data" / "templates" / "apis_v1.json"
-)
-APIS_STANDARD_TEMPLATE = (
+STANDARD_TEMPLATE = (
     Path(__file__).resolve().parents[1]
     / "demo_data"
     / "templates"
@@ -31,26 +28,26 @@ APIS_STANDARD_TEMPLATE = (
 
 @pytest.fixture
 def sample_document() -> dict[str, object]:
-    return json.loads(SAMPLE_TEMPLATE.read_text(encoding="utf-8"))
+    return json.loads(STANDARD_TEMPLATE.read_text(encoding="utf-8"))
 
 
-def test_sample_template_loads_with_exact_version_and_ordered_landmarks() -> None:
-    definition = load_template_definition(SAMPLE_TEMPLATE)
+def test_standard_template_loads_with_exact_version_and_ordered_landmarks() -> None:
+    definition = load_template_definition(STANDARD_TEMPLATE)
 
     assert definition.schema_version == "1.0"
     assert definition.order == "Hymenoptera"
     assert definition.genus == "Apis"
     assert definition.genus_code == "APIS"
-    assert definition.version == 1
+    assert definition.version == 2
     assert definition.status is TemplateStatus.PUBLISHED
     assert definition.wing_side is WingSide.RIGHT
     assert definition.wing_type is WingType.FOREWING
-    assert [item.ordinal for item in definition.landmarks] == list(range(1, 11))
-    assert definition.reference_image is None
+    assert [item.ordinal for item in definition.landmarks] == list(range(1, 20))
+    assert definition.reference_image is not None
 
 
 def test_apis_standard_template_declares_reference_image() -> None:
-    definition = load_template_definition(APIS_STANDARD_TEMPLATE)
+    definition = load_template_definition(STANDARD_TEMPLATE)
 
     assert definition.version == 2
     assert len(definition.landmarks) == 19
@@ -126,7 +123,7 @@ def test_admin_can_import_template_and_repeat_is_idempotent(
     db_session: Session,
     administrator: User,
 ) -> None:
-    definition = load_template_definition(SAMPLE_TEMPLATE)
+    definition = load_template_definition(STANDARD_TEMPLATE)
 
     created = create_template(db_session, definition, created_by=administrator)
     same = create_template(db_session, definition, created_by=administrator)
@@ -138,17 +135,17 @@ def test_admin_can_import_template_and_repeat_is_idempotent(
     assert created.taxon.order_name == "Hymenoptera"
     assert created.taxon.genus == "Apis"
     assert created.taxon.genus_code == "APIS"
-    assert [item.ordinal for item in created.landmarks] == list(range(1, 11))
+    assert [item.ordinal for item in created.landmarks] == list(range(1, 20))
     assert db_session.scalar(select(func.count()).select_from(Taxon)) == 1
     assert db_session.scalar(select(func.count()).select_from(LandmarkTemplate)) == 1
-    assert db_session.scalar(select(func.count()).select_from(TemplateLandmark)) == 10
+    assert db_session.scalar(select(func.count()).select_from(TemplateLandmark)) == 19
 
 
 def test_non_admin_cannot_import_a_template(
     db_session: Session,
     student: User,
 ) -> None:
-    definition = load_template_definition(SAMPLE_TEMPLATE)
+    definition = load_template_definition(STANDARD_TEMPLATE)
 
     with pytest.raises(AuthorizationError):
         create_template(db_session, definition, created_by=student)
@@ -184,6 +181,6 @@ def test_inactive_administrator_cannot_import_template(
     with pytest.raises(AuthorizationError):
         create_template(
             db_session,
-            load_template_definition(SAMPLE_TEMPLATE),
+            load_template_definition(STANDARD_TEMPLATE),
             created_by=administrator,
         )

@@ -17,7 +17,7 @@ from wing_repository.services import (
     approve_user_account,
     authenticate_user,
     create_user_account,
-    import_bundled_sample_template,
+    import_bundled_standard_template,
     request_student_signup,
 )
 
@@ -108,27 +108,27 @@ def test_student_signup_email_must_be_unique(db_session: Session) -> None:
         )
 
 
-def test_administrator_can_import_bundled_sample_template(
+def test_administrator_can_import_bundled_standard_template(
     db_session: Session,
     administrator: User,
 ) -> None:
-    created = import_bundled_sample_template(db_session, administrator)
-    same = import_bundled_sample_template(db_session, administrator)
+    created = import_bundled_standard_template(db_session, administrator)
+    same = import_bundled_standard_template(db_session, administrator)
 
     assert same.id == created.id
     assert created.status is TemplateStatus.PUBLISHED
     assert created.taxon.genus == "Apis"
     assert created.taxon.genus_code == "APIS"
-    assert len(created.landmarks) == 10
+    assert len(created.landmarks) == 19
     assert db_session.scalar(select(func.count()).select_from(LandmarkTemplate)) == 1
 
 
-def test_non_administrator_cannot_import_bundled_sample_template(
+def test_non_administrator_cannot_import_bundled_standard_template(
     db_session: Session,
     student: User,
 ) -> None:
     with pytest.raises(AuthorizationError):
-        import_bundled_sample_template(db_session, student)
+        import_bundled_standard_template(db_session, student)
 
 
 def test_administrator_can_create_student_account(

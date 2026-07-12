@@ -93,9 +93,10 @@ Google OAuth or email verification; administrator approval is required before
 the new account can sign in.
 
 If a newly provisioned hosted database has no published landmark templates, the
-administrator page offers a **Load bundled Apis v1 template** action. This
-imports the sample `demo_data/templates/apis_v1.json` template so approved
-students can be assigned without shell access to the hosted database.
+administrator page offers a **Load bundled Apis 19-landmark template** action.
+This imports the sample `demo_data/templates/apis_standard_19_v2.json` template
+so approved students can be assigned without shell access to the hosted
+database.
 
 ## Run
 
@@ -159,25 +160,23 @@ templates should be provisioned through reviewed administrative procedures.
 
 ## Landmark template JSON
 
-The illustrative, versioned template is at
-`demo_data/templates/apis_v1.json`. Each template fixes a genus, version, wing
-side/type, point count, ordinal sequence, labels, and descriptions. Once a
-template is used by an annotation it is treated as immutable; corrections are
-new template versions.
-
-The published-reference analysis module uses a separate draft template at
+The bundled active template is at
 `demo_data/templates/apis_standard_19_v2.json`:
 
 - `Apis right forewing standard 19-landmark template`
 - version `2`
 - right forewing only
 - 19 fixed landmarks
-- initial status `draft`
+- status `published`
 - optional visual guide image:
   `demo_data/reference_guides/apis_standard_19_v2_landmark_guide.png`
 
-Do not edit or delete the v1 teaching template. The v2 template must be
-reviewed and explicitly published before analysis models can be activated.
+Each template fixes a genus, version, wing side/type, point count, ordinal
+sequence, labels, and descriptions. Once a template is used by an annotation it
+is treated as immutable; corrections are new template versions. The old bundled
+10-landmark Apis teaching template has been retired and removed from new
+assignments to avoid confusion.
+
 The guide image is displayed only to help human landmark placement; the app
 does not extract coordinates from it, does not save its pixels with specimen
 records, and does not mix it with uploaded-wing coordinates. Replace the
@@ -203,7 +202,7 @@ requires:
 2. Running the database migration.
 3. Importing the coordinates.
 4. Validating the imported data.
-5. Publishing the Version 2 landmark template.
+5. Confirming the bundled 19-landmark template is published.
 6. Building and activating the models.
 
 Configure local source directories and an artifact directory:

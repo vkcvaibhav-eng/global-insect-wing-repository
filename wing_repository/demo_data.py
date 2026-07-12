@@ -15,19 +15,28 @@ from PIL import Image, ImageDraw, ImageFont
 DEMO_IMAGE_WIDTH = 1_600
 DEMO_IMAGE_HEIGHT = 900
 
-# Locations corresponding loosely to the illustrative JSON descriptions. They
-# are only seed coordinates for exercising the software workflow.
+# Locations corresponding loosely to the bundled Apis 19-landmark template.
+# They are only seed coordinates for exercising the software workflow.
 DEMO_LANDMARK_PIXELS: tuple[tuple[float, float], ...] = (
-    (178.0, 524.0),
-    (304.0, 356.0),
-    (595.0, 235.0),
-    (1_330.0, 260.0),
-    (1_180.0, 385.0),
-    (835.0, 435.0),
-    (1_120.0, 580.0),
-    (1_292.0, 690.0),
-    (350.0, 690.0),
-    (700.0, 615.0),
+    (497.0, 398.0),
+    (546.0, 402.0),
+    (656.0, 187.0),
+    (656.0, 332.0),
+    (672.0, 566.0),
+    (833.0, 174.0),
+    (954.0, 86.0),
+    (905.0, 151.0),
+    (1_007.0, 246.0),
+    (943.0, 309.0),
+    (1_040.0, 387.0),
+    (1_041.0, 507.0),
+    (1_075.0, 606.0),
+    (1_128.0, 114.0),
+    (1_220.0, 223.0),
+    (1_392.0, 337.0),
+    (1_479.0, 349.0),
+    (1_490.0, 435.0),
+    (192.0, 202.0),
 )
 
 

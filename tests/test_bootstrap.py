@@ -89,7 +89,7 @@ def test_existing_alembic_database_is_upgraded_on_startup(
         with app_engine.connect() as connection:
             assert connection.scalar(
                 text("SELECT version_num FROM alembic_version")
-            ) == "0005_apis_analysis"
+            ) == "0006_retire_apis_v1"
         assert "scale_mm_per_pixel" in {
             column["name"] for column in inspect(app_engine).get_columns("wing_images")
         }

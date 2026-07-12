@@ -29,13 +29,13 @@ Artifacts are never overwritten.
 
 ## Activation command
 
-Publish/review the v2 Apis template first, then run:
+After confirming the bundled Apis 19-landmark template is published, run:
 
 ```powershell
 python -m wing_repository.reference_data activate-models --model-version 1
 ```
 
-Activation fails if the model set is incomplete or the template remains draft.
+Activation fails if the model set is incomplete or the template is not published.
 
 ## Stored validation metrics
 

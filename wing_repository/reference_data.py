@@ -98,7 +98,7 @@ def _first_active_admin(session: Session) -> User:
 
 
 def ensure_apis_19_template(session: Session, *, admin_email: str | None = None) -> LandmarkTemplate:
-    """Create or return the draft v2 Apis 19-landmark template."""
+    """Create or return the bundled published Apis 19-landmark template."""
 
     existing = session.scalar(
         select(LandmarkTemplate)

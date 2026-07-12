@@ -62,7 +62,7 @@ requires:
 2. Running the database migration.
 3. Importing the coordinates.
 4. Validating the imported data.
-5. Publishing the Version 2 landmark template.
+5. Confirming the bundled 19-landmark template is published.
 6. Building and activating the models.
 
 ## Template
@@ -71,14 +71,15 @@ The required template JSON is:
 
 `demo_data/templates/apis_standard_19_v2.json`
 
-It is version `2` and starts in `draft` status. It must remain separate from the
-existing v1 teaching template. Existing annotations stay pinned to their exact
-original template.
+It is the only bundled active Apis template and is published by default. Its
+internal version remains `2` so any historical Version 1 teaching annotations
+stay pinned to their exact original template instead of being silently
+reinterpreted.
 
 An analysis model can become active only after:
 
 1. The template exists in the database.
-2. The template has been reviewed and published by an administrator.
+2. The template is published.
 3. The model build validates successfully.
 4. `python -m wing_repository.reference_data activate-models --model-version N`
    is run.

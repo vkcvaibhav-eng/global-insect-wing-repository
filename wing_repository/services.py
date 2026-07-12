@@ -54,8 +54,11 @@ from .template_loader import create_template, load_template_definition
 
 
 MIN_ACCOUNT_PASSWORD_CHARACTERS = 12
-BUNDLED_SAMPLE_TEMPLATE_PATH = (
-    Path(__file__).resolve().parents[1] / "demo_data" / "templates" / "apis_v1.json"
+BUNDLED_STANDARD_TEMPLATE_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "demo_data"
+    / "templates"
+    / "apis_standard_19_v2.json"
 )
 LENGTH_UNIT_TO_MM = {
     "mm": 1.0,
@@ -259,14 +262,20 @@ def create_user_account(
     return user
 
 
-def import_bundled_sample_template(session: Session, actor: User) -> LandmarkTemplate:
-    """Import the bundled Apis v1 template so assignments can be created."""
+def import_bundled_standard_template(session: Session, actor: User) -> LandmarkTemplate:
+    """Import the bundled Apis 19-landmark template so assignments can be created."""
 
     require_active_role(actor, Role.ADMINISTRATOR)
-    definition = load_template_definition(BUNDLED_SAMPLE_TEMPLATE_PATH)
+    definition = load_template_definition(BUNDLED_STANDARD_TEMPLATE_PATH)
     template = create_template(session, definition, created_by=actor)
     session.commit()
     return template
+
+
+def import_bundled_sample_template(session: Session, actor: User) -> LandmarkTemplate:
+    """Backward-compatible alias for the bundled standard template import."""
+
+    return import_bundled_standard_template(session, actor)
 
 
 def get_active_assignment(
@@ -1339,6 +1348,7 @@ __all__ = [
     "delete_annotation_point",
     "get_active_assignment",
     "import_bundled_sample_template",
+    "import_bundled_standard_template",
     "list_repository_records",
     "list_student_annotations",
     "list_submitted_annotations",

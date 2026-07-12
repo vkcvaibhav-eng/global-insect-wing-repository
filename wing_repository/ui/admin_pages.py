@@ -20,7 +20,7 @@ from wing_repository.services import (
     create_assignment,
     create_user_account,
     deactivate_assignment,
-    import_bundled_sample_template,
+    import_bundled_standard_template,
 )
 from wing_repository.ui.common import format_template
 
@@ -191,10 +191,10 @@ def render_administration(session: Session, user: User) -> None:
     if not templates:
         st.info(
             "At least one published landmark template is required. The "
-            "demonstration seed creates one."
+            "bundled standard Apis 19-landmark template can be loaded now."
         )
-        if st.button("Load bundled Apis v1 template", type="primary"):
-            template = import_bundled_sample_template(session, user)
+        if st.button("Load bundled Apis 19-landmark template", type="primary"):
+            template = import_bundled_standard_template(session, user)
             st.toast(f"Loaded {format_template(template)}.")
             st.rerun()
     elif not students:

@@ -48,7 +48,9 @@ from wing_repository.template_loader import create_template, load_template_defin
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-TEMPLATE_PATH = REPOSITORY_ROOT / "demo_data" / "templates" / "apis_v1.json"
+TEMPLATE_PATH = (
+    REPOSITORY_ROOT / "demo_data" / "templates" / "apis_standard_19_v2.json"
+)
 
 PASSWORD_ENVIRONMENT = {
     Role.ADMINISTRATOR: "WBR_DEMO_ADMIN_PASSWORD",

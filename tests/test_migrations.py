@@ -56,7 +56,7 @@ def test_alembic_upgrades_an_empty_sqlite_database_to_head(
             with engine.connect() as connection:
                 assert connection.scalar(
                     text("SELECT version_num FROM alembic_version")
-                ) == "0005_apis_analysis"
+                ) == "0006_retire_apis_v1"
                 wing_columns = {
                     column["name"] for column in inspect(engine).get_columns("wing_images")
                 }
@@ -71,6 +71,91 @@ def test_alembic_upgrades_an_empty_sqlite_database_to_head(
                     "scale_y2_pixel",
                     "scale_calibrated_at",
                 } <= wing_columns
+        finally:
+            engine.dispose()
+    finally:
+        get_settings.cache_clear()
+
+
+def test_migration_0006_retires_old_apis_template_and_assignments(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    database_path = tmp_path / "retire-old-template.sqlite3"
+    database_url = f"sqlite:///{database_path.as_posix()}"
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    get_settings.cache_clear()
+    config = Config(str(PROJECT_ROOT / "alembic.ini"))
+
+    try:
+        command.upgrade(config, "0005_apis_analysis")
+        engine = build_engine(database_url)
+        try:
+            with engine.begin() as connection:
+                connection.execute(
+                    text(
+                        """
+                        INSERT INTO users
+                            (id, email, full_name, password_hash, role, is_active)
+                        VALUES
+                            (100, 'admin@example.test', 'Admin', 'hash',
+                             'administrator', 1),
+                            (101, 'student@example.test', 'Student', 'hash',
+                             'student', 1)
+                        """
+                    )
+                )
+                connection.execute(
+                    text(
+                        """
+                        INSERT INTO taxa
+                            (id, order_name, order_code, family, genus,
+                             genus_code, next_accession_serial)
+                        VALUES
+                            (200, 'Hymenoptera', 'HYM', 'Apidae', 'Apis',
+                             'APIS', 1)
+                        """
+                    )
+                )
+                connection.execute(
+                    text(
+                        """
+                        INSERT INTO landmark_templates
+                            (id, taxon_id, version, name, side, wing_type,
+                             status, created_by_id)
+                        VALUES
+                            (300, 200, 1, 'Apis right-forewing teaching template',
+                             'right', 'forewing', 'published', 100)
+                        """
+                    )
+                )
+                connection.execute(
+                    text(
+                        """
+                        INSERT INTO assignments
+                            (id, student_id, taxon_id, template_id,
+                             assigned_by_id, is_active)
+                        VALUES
+                            (400, 101, 200, 300, 100, 1)
+                        """
+                    )
+                )
+            engine.dispose()
+
+            command.upgrade(config, "head")
+            engine = build_engine(database_url)
+            with engine.connect() as connection:
+                assert connection.scalar(
+                    text("SELECT version_num FROM alembic_version")
+                ) == "0006_retire_apis_v1"
+                assert connection.scalar(
+                    text("SELECT status FROM landmark_templates WHERE id = 300")
+                ) == "retired"
+                row = connection.execute(
+                    text("SELECT is_active, ended_at FROM assignments WHERE id = 400")
+                ).one()
+                assert row.is_active in (False, 0)
+                assert row.ended_at is not None
         finally:
             engine.dispose()
     finally:

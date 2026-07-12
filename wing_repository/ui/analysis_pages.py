@@ -213,7 +213,7 @@ def render_published_apis_reference_analysis(session: Session, user: User) -> No
     if not candidates:
         st.info(
             "No complete 19-landmark Apis right-forewing annotation is available "
-            "for this account. The v1 10-landmark teaching template cannot be analysed."
+            "for this account."
         )
         return
     annotation_by_id = {annotation.id: annotation for annotation in candidates}

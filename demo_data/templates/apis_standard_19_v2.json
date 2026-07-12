@@ -6,10 +6,10 @@
   "genus_code": "APIS",
   "template_name": "Apis right forewing standard 19-landmark template",
   "version": 2,
-  "status": "draft",
+  "status": "published",
   "wing_side": "RIGHT",
   "wing_type": "FOREWING",
-  "description": "Draft research template for Apis mellifera worker right forewing shape analysis. The ordinal order LM01-LM19 follows the published honey bee forewing landmark system used by Oleksa et al. (2023), DOI 10.1093/gigascience/giad019, and the referenced 19-landmark lineage dataset DOI 10.5281/zenodo.7567336. Keep this template in draft status until an administrator explicitly approves the anatomical definitions for production use.",
+  "description": "Default Version 0.1 Apis right-forewing 19-landmark template for manual digitization and shape analysis. The ordinal order LM01-LM19 follows the published honey bee forewing landmark system used by Oleksa et al. (2023), DOI 10.1093/gigascience/giad019, and the referenced 19-landmark lineage dataset DOI 10.5281/zenodo.7567336. Use this template for Apis right forewings unless an expert reviewer publishes a later replacement version.",
   "reference_image": {
     "uri": "demo_data/reference_guides/apis_standard_19_v2_landmark_guide.png",
     "caption": "Apis right forewing 19-landmark guide. Use only as a visual placement reference; save clicks on the uploaded specimen image.",
