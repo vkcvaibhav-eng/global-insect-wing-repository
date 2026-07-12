@@ -13,6 +13,7 @@ from wing_repository.db import build_engine
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 POSTGRES_IDENTIFIER_LIMIT = 63
+ALEMBIC_VERSION_NUM_LIMIT = 32
 
 
 def test_alembic_upgrades_an_empty_sqlite_database_to_head(
@@ -55,7 +56,7 @@ def test_alembic_upgrades_an_empty_sqlite_database_to_head(
             with engine.connect() as connection:
                 assert connection.scalar(
                     text("SELECT version_num FROM alembic_version")
-                ) == "0005_published_apis_reference_analysis"
+                ) == "0005_apis_analysis"
                 wing_columns = {
                     column["name"] for column in inspect(engine).get_columns("wing_images")
                 }
@@ -90,5 +91,23 @@ def test_migration_identifiers_fit_postgresql_limit() -> None:
             for name in sorted(names)
             if len(name) > POSTGRES_IDENTIFIER_LIMIT
         )
+
+    assert too_long == []
+
+
+def test_alembic_revision_ids_fit_default_version_table() -> None:
+    migration_paths = sorted((PROJECT_ROOT / "alembic" / "versions").glob("*.py"))
+    assert migration_paths
+
+    too_long: list[str] = []
+    for migration_path in migration_paths:
+        migration_text = migration_path.read_text(encoding="utf-8")
+        match = re.search(r'^revision:\s*str\s*=\s*"([^"]+)"', migration_text, re.M)
+        assert match is not None, migration_path.name
+        revision_id = match.group(1)
+        if len(revision_id) > ALEMBIC_VERSION_NUM_LIMIT:
+            too_long.append(
+                f"{migration_path.name}: {revision_id} ({len(revision_id)})"
+            )
 
     assert too_long == []

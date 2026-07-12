@@ -1,6 +1,6 @@
 """Add published Apis reference analysis schema.
 
-Revision ID: 0005_published_apis_reference_analysis
+Revision ID: 0005_apis_analysis
 Revises: 0004_deleted_annotation_status
 """
 
@@ -12,7 +12,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = "0005_published_apis_reference_analysis"
+revision: str = "0005_apis_analysis"
 down_revision: str | None = "0004_deleted_annotation_status"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
