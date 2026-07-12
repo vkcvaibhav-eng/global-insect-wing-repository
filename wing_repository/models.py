@@ -41,6 +41,7 @@ from wing_repository.enums import (
     AnalysisType,
     ReviewDecision,
     Role,
+    SpeciesIdentificationMethod,
     TemplateStatus,
     WingSide,
     WingType,
@@ -184,6 +185,14 @@ class LandmarkTemplate(Base):
     __table_args__ = (
         UniqueConstraint("taxon_id", "version", name="uq_templates_taxon_version"),
         CheckConstraint("version >= 1", name="version_positive"),
+        CheckConstraint(
+            "minimum_wings_per_locality >= 1",
+            name="minimum_wings_per_locality_positive",
+        ),
+        CheckConstraint(
+            "recommended_wings_per_locality >= minimum_wings_per_locality",
+            name="recommended_wings_not_below_minimum",
+        ),
         CheckConstraint("length(trim(name)) >= 1", name="name_nonempty"),
         CheckConstraint(
             "source_sha256 IS NULL OR length(source_sha256) = 64",
@@ -225,6 +234,12 @@ class LandmarkTemplate(Base):
         DateTime(timezone=True), nullable=False, default=utc_now, server_default=func.now()
     )
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    minimum_wings_per_locality: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=10, server_default="10"
+    )
+    recommended_wings_per_locality: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=15, server_default="15"
+    )
 
     taxon: Mapped[Taxon] = relationship(back_populates="landmark_templates")
     creator: Mapped[User] = relationship(back_populates="templates_created")
@@ -333,12 +348,31 @@ class Specimen(Base):
             "contributor_id", "specimen_code", name="uq_specimens_contributor_code"
         ),
         CheckConstraint("length(trim(specimen_code)) >= 1", name="code_nonempty"),
+        UniqueConstraint(
+            "contributor_id",
+            "locality_sample_code",
+            "locality_sample_number",
+            name="uq_specimens_contributor_locality_sample_number",
+        ),
         CheckConstraint(
             "latitude IS NULL OR latitude BETWEEN -90 AND 90", name="latitude_range"
         ),
         CheckConstraint(
             "longitude IS NULL OR longitude BETWEEN -180 AND 180",
             name="longitude_range",
+        ),
+        CheckConstraint(
+            "locality_sample_size IS NULL OR locality_sample_size >= 1",
+            name="locality_sample_size_positive",
+        ),
+        CheckConstraint(
+            "locality_sample_number IS NULL OR locality_sample_number >= 1",
+            name="locality_sample_number_positive",
+        ),
+        CheckConstraint(
+            "locality_sample_size IS NULL OR locality_sample_number IS NULL "
+            "OR locality_sample_number <= locality_sample_size",
+            name="locality_sample_number_within_size",
         ),
     )
 
@@ -354,10 +388,24 @@ class Specimen(Base):
     )
     specimen_code: Mapped[str] = mapped_column(String(120), nullable=False)
     species_text: Mapped[str | None] = mapped_column(String(200))
+    species_identification_method: Mapped[
+        SpeciesIdentificationMethod | None
+    ] = mapped_column(
+        enum_column_type(
+            SpeciesIdentificationMethod,
+            name="species_identification_method_enum",
+            length=24,
+        )
+    )
+    genbank_accession: Mapped[str | None] = mapped_column(String(120))
+    taxonomist_name: Mapped[str | None] = mapped_column(String(200))
     sex: Mapped[str | None] = mapped_column(String(40))
     collection_date: Mapped[date | None] = mapped_column(Date)
     country: Mapped[str | None] = mapped_column(String(100))
     locality: Mapped[str | None] = mapped_column(Text)
+    locality_sample_code: Mapped[str | None] = mapped_column(String(120))
+    locality_sample_size: Mapped[int | None] = mapped_column(Integer)
+    locality_sample_number: Mapped[int | None] = mapped_column(Integer)
     latitude: Mapped[float | None] = mapped_column(Float)
     longitude: Mapped[float | None] = mapped_column(Float)
     collector_name: Mapped[str | None] = mapped_column(String(200))

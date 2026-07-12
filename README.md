@@ -18,7 +18,11 @@ cross-template morphometric comparison.
    inactive until an administrator approves it.
 2. An administrator assigns each approved student to one genus and one exact
    landmark template version.
-3. The student records specimen metadata and uploads a right-forewing image.
+3. The student records required specimen metadata and uploads a right-forewing
+   image. Required fields include species identification, identification
+   method, sex, collection date, country, locality, collector, locality sample
+   code, planned locality sample count, and the specimen number within that
+   1..N locality set. Notes remain optional.
 4. The student calibrates image scale from a visible reference length, such as
    a 1 mm scale bar, then places the template's numbered landmarks with the
    zoomed digitization view.
@@ -163,6 +167,10 @@ sequence, labels, and descriptions. Once a template is used by an annotation it
 is treated as immutable; corrections are new template versions. The old bundled
 10-landmark Apis teaching template has been retired and removed from new
 assignments to avoid confusion.
+
+Administrators can set the template's locality sampling policy. The default
+policy is minimum 10 right forewings from one locality and advisable 15. The
+student metadata form enforces that minimum for new records.
 
 The guide image is displayed only to help human landmark placement; the app
 does not extract coordinates from it, does not save its pixels with specimen
@@ -314,5 +322,7 @@ tests/                         Automated workflow and migration tests
   `y_normalized = y_pixel / image_height` are saved for each point.
 - Approved accessions refer to one exact immutable annotation revision and
   template version.
+- Locality sample codes and sample numbers preserve 1..N collection grouping;
+  Version 0.1 does not yet issue one shared accession to a multi-wing batch.
 - Different template versions are never combined automatically.
 - PCA scores are neither calculated nor used as identifiers.

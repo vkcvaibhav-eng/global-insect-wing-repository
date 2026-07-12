@@ -70,9 +70,25 @@ def render_expert_review(session: Session, user: User) -> None:
         st.write(f"**Template:** {format_template(annotation.template)}")
         st.write(f"**Specimen code:** {specimen.specimen_code}")
         st.write(f"**Species:** {specimen.species_text or 'Not supplied'}")
+        st.write(
+            "**Identification method:** "
+            f"{specimen.species_identification_method.value if specimen.species_identification_method else 'Not supplied'}"
+        )
+        if specimen.genbank_accession:
+            st.write(f"**GenBank accession:** {specimen.genbank_accession}")
+        if specimen.taxonomist_name:
+            st.write(f"**Taxonomist:** {specimen.taxonomist_name}")
         st.write(f"**Sex:** {specimen.sex or 'Not supplied'}")
+        st.write(f"**Collection date:** {specimen.collection_date or 'Not supplied'}")
+        st.write(f"**Collector:** {specimen.collector_name or 'Not supplied'}")
         st.write(f"**Country:** {specimen.country or 'Not supplied'}")
         st.write(f"**Locality:** {specimen.locality or 'Not supplied'}")
+        st.write(
+            "**Locality sample:** "
+            f"{specimen.locality_sample_code or 'Not supplied'} "
+            f"{specimen.locality_sample_number or '?'}/"
+            f"{specimen.locality_sample_size or '?'}"
+        )
         st.write(
             f"**Voucher:** {specimen.voucher_institution or 'Not supplied'} / "
             f"{specimen.voucher_code or 'Not supplied'}"

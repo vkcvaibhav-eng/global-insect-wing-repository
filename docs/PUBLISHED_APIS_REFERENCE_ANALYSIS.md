@@ -91,8 +91,9 @@ Every report displays:
 > Results from a single wing are less reliable than results based on the mean
 > shape of multiple workers from one colony or locality.
 
-Future sample-level analysis can combine 10–20 workers from one colony or
-locality, but hindwings remain out of scope.
+Version 0.1 now records locality sample code, planned sample size, and the wing
+number within that 1..N set. Future sample-level analysis can combine those
+workers from one colony or locality, but hindwings remain out of scope.
 
 ## No-reliable-match outcome
 

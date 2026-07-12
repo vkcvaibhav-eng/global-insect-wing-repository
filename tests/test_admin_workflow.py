@@ -20,6 +20,7 @@ from wing_repository.services import (
     import_bundled_standard_template,
     request_account_signup,
     request_student_signup,
+    update_template_sample_requirements,
 )
 
 
@@ -160,6 +161,40 @@ def test_non_administrator_cannot_import_bundled_standard_template(
 ) -> None:
     with pytest.raises(AuthorizationError):
         import_bundled_standard_template(db_session, student)
+
+
+def test_administrator_can_update_template_sampling_requirements(
+    db_session: Session,
+    administrator: User,
+) -> None:
+    template = import_bundled_standard_template(db_session, administrator)
+
+    updated = update_template_sample_requirements(
+        db_session,
+        administrator,
+        template_id=template.id,
+        minimum_wings_per_locality=12,
+        recommended_wings_per_locality=18,
+    )
+
+    assert updated.minimum_wings_per_locality == 12
+    assert updated.recommended_wings_per_locality == 18
+
+
+def test_template_sampling_recommended_cannot_be_below_minimum(
+    db_session: Session,
+    administrator: User,
+) -> None:
+    template = import_bundled_standard_template(db_session, administrator)
+
+    with pytest.raises(ValidationError, match="Recommended"):
+        update_template_sample_requirements(
+            db_session,
+            administrator,
+            template_id=template.id,
+            minimum_wings_per_locality=12,
+            recommended_wings_per_locality=10,
+        )
 
 
 def test_administrator_can_create_student_account(

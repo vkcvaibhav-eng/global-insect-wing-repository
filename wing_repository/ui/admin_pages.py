@@ -21,6 +21,7 @@ from wing_repository.services import (
     create_user_account,
     deactivate_assignment,
     import_bundled_standard_template,
+    update_template_sample_requirements,
 )
 from wing_repository.ui.common import format_template
 
@@ -39,6 +40,7 @@ def _assignment_rows(assignments: list[Assignment]) -> pd.DataFrame:
                 "genus": assignment.taxon.genus,
                 "template_id": assignment.template_id,
                 "template_version": assignment.template.version,
+                "minimum_wings_per_locality": assignment.template.minimum_wings_per_locality,
                 "active": assignment.is_active,
                 "assigned_at": assignment.assigned_at,
                 "ended_at": assignment.ended_at,
@@ -199,39 +201,85 @@ def render_administration(session: Session, user: User) -> None:
             template = import_bundled_standard_template(session, user)
             st.toast(f"Loaded {format_template(template)}.")
             st.rerun()
-    elif not students:
-        st.info("Every active student already has an active assignment.")
     else:
-        students_by_id = {student.id: student for student in students}
         templates_by_id = {template.id: template for template in templates}
-        with st.form("create_assignment_form"):
-            selected_student_id = st.selectbox(
-                "Student",
-                list(students_by_id),
-                format_func=lambda student_id: (
-                    f"{students_by_id[student_id].full_name} · "
-                    f"{students_by_id[student_id].email}"
-                ),
-            )
-            selected_template_id = st.selectbox(
-                "Exact published template",
+        st.subheader("Template locality sampling requirements")
+        st.caption(
+            "Set how many right forewings should be collected from one locality. "
+            "The default policy is minimum 10 and advisable 15."
+        )
+        with st.form("template_sampling_policy_form"):
+            sampling_template_id = st.selectbox(
+                "Template",
                 list(templates_by_id),
                 format_func=lambda template_id: format_template(
                     templates_by_id[template_id]
                 ),
             )
-            submitted = st.form_submit_button("Assign student", type="primary")
-        if submitted:
-            template = templates_by_id[selected_template_id]
-            assignment = create_assignment(
+            selected_sampling_template = templates_by_id[sampling_template_id]
+            sampling_columns = st.columns(2)
+            minimum_wings = sampling_columns[0].number_input(
+                "Minimum wings from one locality",
+                min_value=1,
+                value=selected_sampling_template.minimum_wings_per_locality,
+                step=1,
+            )
+            recommended_wings = sampling_columns[1].number_input(
+                "Advisable wings from one locality",
+                min_value=1,
+                value=selected_sampling_template.recommended_wings_per_locality,
+                step=1,
+            )
+            update_sampling_policy = st.form_submit_button(
+                "Save sampling requirement",
+                type="primary",
+            )
+        if update_sampling_policy:
+            updated = update_template_sample_requirements(
                 session,
                 user,
-                student_id=selected_student_id,
-                taxon_id=template.taxon_id,
-                template_id=selected_template_id,
+                template_id=sampling_template_id,
+                minimum_wings_per_locality=int(minimum_wings),
+                recommended_wings_per_locality=int(recommended_wings),
             )
-            st.toast(f"Assignment {assignment.id} created.")
+            st.toast(
+                f"Saved sampling requirement for {format_template(updated)}."
+            )
             st.rerun()
+
+        if not students:
+            st.info("Every active student already has an active assignment.")
+        else:
+            students_by_id = {student.id: student for student in students}
+            st.subheader("Create assignment")
+            with st.form("create_assignment_form"):
+                selected_student_id = st.selectbox(
+                    "Student",
+                    list(students_by_id),
+                    format_func=lambda student_id: (
+                        f"{students_by_id[student_id].full_name} · "
+                        f"{students_by_id[student_id].email}"
+                    ),
+                )
+                selected_template_id = st.selectbox(
+                    "Exact published template",
+                    list(templates_by_id),
+                    format_func=lambda template_id: format_template(
+                        templates_by_id[template_id]
+                    ),
+                )
+                submitted = st.form_submit_button("Assign student", type="primary")
+            if submitted:
+                template = templates_by_id[selected_template_id]
+                assignment = create_assignment(
+                    session,
+                    user,
+                    student_id=selected_student_id,
+                    taxon_id=template.taxon_id,
+                    template_id=selected_template_id,
+                )
+                st.toast(f"Assignment {assignment.id} created.")
+                st.rerun()
 
     assignments = list(
         session.scalars(

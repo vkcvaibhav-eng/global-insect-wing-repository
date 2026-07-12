@@ -1,13 +1,19 @@
 from __future__ import annotations
 
 import csv
+from datetime import date
 from io import StringIO
 
 import pytest
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from wing_repository.enums import AnnotationStatus, ReviewDecision, TemplateStatus
+from wing_repository.enums import (
+    AnnotationStatus,
+    ReviewDecision,
+    SpeciesIdentificationMethod,
+    TemplateStatus,
+)
 from wing_repository.errors import (
     AuthorizationError,
     ConflictError,
@@ -41,6 +47,21 @@ from wing_repository.services import (
 POINTS = ((10.0, 5.0), (20.5, 10.25), (30.0, 15.0))
 
 
+def _required_metadata(specimen_code: str) -> dict[str, object]:
+    return {
+        "species_text": "Apis mellifera",
+        "species_identification_method": SpeciesIdentificationMethod.DICHOTOMOUS_KEY,
+        "sex": "worker",
+        "collection_date": date(2026, 1, 1),
+        "country": "India",
+        "locality": "Test locality",
+        "locality_sample_code": f"{specimen_code}-LOC",
+        "locality_sample_size": 15,
+        "locality_sample_number": 1,
+        "collector_name": "Test Collector",
+    }
+
+
 def _submitted_annotation(
     session: Session,
     student: User,
@@ -61,6 +82,7 @@ def _submitted_annotation(
         image_bytes=data,
         original_filename=filename,
         assignment_id=assignment.id,
+        **_required_metadata(specimen_code),
     )
     if calibrate:
         calibrate_wing_image_scale(
@@ -335,6 +357,12 @@ def test_csv_and_tps_are_approved_only_ordered_and_exact_template(
     assert {row["template_id"] for row in rows} == {str(landmark_template.id)}
     assert {row["template_version"] for row in rows} == {"1"}
     assert {row["specimen_code"] for row in rows} == {"APIS,APPROVED"}
+    assert {row["species"] for row in rows} == {"Apis mellifera"}
+    assert {row["species_identification_method"] for row in rows} == {
+        "dichotomous_key"
+    }
+    assert {row["locality_sample_size"] for row in rows} == {"15"}
+    assert {row["locality_sample_number"] for row in rows} == {"1"}
     assert {row["original_filename"] for row in rows} == {"wing, source.png"}
 
     tps_text = export_approved_tps(db_session, template_id=landmark_template.id)

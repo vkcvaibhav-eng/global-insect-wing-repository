@@ -32,6 +32,12 @@ class TemplateStatus(StringEnum):
     RETIRED = "retired"
 
 
+class SpeciesIdentificationMethod(StringEnum):
+    MOLECULAR = "molecular"
+    TAXONOMIST = "taxonomist"
+    DICHOTOMOUS_KEY = "dichotomous_key"
+
+
 class AnnotationStatus(StringEnum):
     DRAFT = "draft"
     SUBMITTED = "submitted"

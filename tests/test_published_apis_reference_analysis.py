@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 import json
 from pathlib import Path
 
@@ -10,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from wing_repository.analysis_services import activate_validated_models, run_published_apis_reference_analysis
 from wing_repository.config import get_settings
-from wing_repository.enums import TemplateStatus
+from wing_repository.enums import SpeciesIdentificationMethod, TemplateStatus
 from wing_repository.errors import ValidationError
 from wing_repository.image_store import LocalImageStore
 from wing_repository.models import (
@@ -147,6 +148,15 @@ def _query_annotation(
         image_store,
         specimen_code="APIS-MELLIFERA-QUERY",
         species_text="Apis mellifera worker",
+        species_identification_method=SpeciesIdentificationMethod.DICHOTOMOUS_KEY,
+        sex="worker",
+        collection_date=date(2026, 1, 1),
+        country="India",
+        locality="Test locality",
+        locality_sample_code="APIS-MELLIFERA-QUERY-LOC",
+        locality_sample_size=15,
+        locality_sample_number=1,
+        collector_name="Test Collector",
         image_bytes=image_bytes,
         original_filename="query.png",
         assignment_id=assignment.id,

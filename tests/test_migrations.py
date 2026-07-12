@@ -56,7 +56,7 @@ def test_alembic_upgrades_an_empty_sqlite_database_to_head(
             with engine.connect() as connection:
                 assert connection.scalar(
                     text("SELECT version_num FROM alembic_version")
-                ) == "0006_retire_apis_v1"
+                ) == "0007_sampling_metadata"
                 wing_columns = {
                     column["name"] for column in inspect(engine).get_columns("wing_images")
                 }
@@ -71,6 +71,25 @@ def test_alembic_upgrades_an_empty_sqlite_database_to_head(
                     "scale_y2_pixel",
                     "scale_calibrated_at",
                 } <= wing_columns
+                specimen_columns = {
+                    column["name"] for column in inspect(engine).get_columns("specimens")
+                }
+                assert {
+                    "species_identification_method",
+                    "genbank_accession",
+                    "taxonomist_name",
+                    "locality_sample_code",
+                    "locality_sample_size",
+                    "locality_sample_number",
+                } <= specimen_columns
+                template_columns = {
+                    column["name"]
+                    for column in inspect(engine).get_columns("landmark_templates")
+                }
+                assert {
+                    "minimum_wings_per_locality",
+                    "recommended_wings_per_locality",
+                } <= template_columns
         finally:
             engine.dispose()
     finally:
@@ -147,7 +166,7 @@ def test_migration_0006_retires_old_apis_template_and_assignments(
             with engine.connect() as connection:
                 assert connection.scalar(
                     text("SELECT version_num FROM alembic_version")
-                ) == "0006_retire_apis_v1"
+                ) == "0007_sampling_metadata"
                 assert connection.scalar(
                     text("SELECT status FROM landmark_templates WHERE id = 300")
                 ) == "retired"

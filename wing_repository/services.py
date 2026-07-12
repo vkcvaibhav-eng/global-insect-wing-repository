@@ -21,6 +21,7 @@ from .enums import (
     AnnotationStatus,
     ReviewDecision,
     Role,
+    SpeciesIdentificationMethod,
     TemplateStatus,
     WingSide,
     WingType,
@@ -145,6 +146,96 @@ def _length_to_millimeters(length: float, unit: str) -> tuple[float, str]:
         allowed = ", ".join(sorted(LENGTH_UNIT_TO_MM))
         raise ValidationError(f"Reference unit must be one of: {allowed}.")
     return normalized_length * LENGTH_UNIT_TO_MM[normalized_unit], normalized_unit
+
+
+def _required_collection_date(value: date | None) -> date:
+    if value is None:
+        raise ValidationError("Collection date is required.")
+    if not isinstance(value, date):
+        raise ValidationError("Collection date must be a date.")
+    return value
+
+
+def _required_positive_int(value: int | None, field_name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValidationError(f"{field_name} is required and must be a whole number.")
+    if value < 1:
+        raise ValidationError(f"{field_name} must be at least 1.")
+    return value
+
+
+def _species_identification_method(
+    value: SpeciesIdentificationMethod | str | None,
+) -> SpeciesIdentificationMethod:
+    if isinstance(value, SpeciesIdentificationMethod):
+        return value
+    if isinstance(value, str) and value.strip():
+        try:
+            return SpeciesIdentificationMethod(value.strip())
+        except ValueError as exc:
+            allowed = ", ".join(method.value for method in SpeciesIdentificationMethod)
+            raise ValidationError(
+                f"Species identification method must be one of: {allowed}."
+            ) from exc
+    raise ValidationError("Species identification method is required.")
+
+
+def _species_identification_details(
+    *,
+    method: SpeciesIdentificationMethod,
+    genbank_accession: str | None,
+    taxonomist_name: str | None,
+) -> tuple[str | None, str | None]:
+    normalized_genbank = _optional_text(
+        genbank_accession,
+        "GenBank accession number",
+        max_length=120,
+    )
+    normalized_taxonomist = _optional_text(
+        taxonomist_name,
+        "Taxonomist name",
+        max_length=200,
+    )
+    if method is SpeciesIdentificationMethod.MOLECULAR and normalized_genbank is None:
+        raise ValidationError(
+            "GenBank accession number is required when species identification is molecular."
+        )
+    if method is SpeciesIdentificationMethod.TAXONOMIST and normalized_taxonomist is None:
+        raise ValidationError(
+            "Taxonomist name is required when species identification is by taxonomist."
+        )
+    return normalized_genbank, normalized_taxonomist
+
+
+def _locality_sample_fields(
+    assignment: Assignment,
+    *,
+    locality_sample_code: str | None,
+    locality_sample_size: int | None,
+    locality_sample_number: int | None,
+) -> tuple[str, int, int]:
+    sample_code = _required_text(
+        locality_sample_code or "",
+        "Locality sample code",
+        max_length=120,
+    )
+    sample_size = _required_positive_int(
+        locality_sample_size,
+        "Number of wings from this locality",
+    )
+    minimum = assignment.template.minimum_wings_per_locality
+    if sample_size < minimum:
+        raise ValidationError(
+            f"At least {minimum} wings are required from one locality for "
+            f"{assignment.template.name}."
+        )
+    sample_number = _required_positive_int(
+        locality_sample_number,
+        "This wing number in the locality sample",
+    )
+    if sample_number > sample_size:
+        raise ValidationError("This wing number cannot exceed the locality sample count.")
+    return sample_code, sample_size, sample_number
 
 
 def require_active_role(actor: User, *allowed_roles: Role) -> User:
@@ -386,6 +477,38 @@ def create_assignment(
     return assignment
 
 
+def update_template_sample_requirements(
+    session: Session,
+    actor: User,
+    *,
+    template_id: int,
+    minimum_wings_per_locality: int,
+    recommended_wings_per_locality: int,
+) -> LandmarkTemplate:
+    """Set locality sampling requirements for a published landmark template."""
+
+    require_active_role(actor, Role.ADMINISTRATOR)
+    template = session.get(LandmarkTemplate, template_id)
+    if template is None:
+        raise NotFoundError("Landmark template was not found.")
+    minimum = _required_positive_int(
+        minimum_wings_per_locality,
+        "Minimum wings per locality",
+    )
+    recommended = _required_positive_int(
+        recommended_wings_per_locality,
+        "Recommended wings per locality",
+    )
+    if recommended < minimum:
+        raise ValidationError(
+            "Recommended wings per locality cannot be below the minimum."
+        )
+    template.minimum_wings_per_locality = minimum
+    template.recommended_wings_per_locality = recommended
+    session.commit()
+    return template
+
+
 def deactivate_assignment(
     session: Session,
     actor: User,
@@ -440,10 +563,16 @@ def _build_specimen(
     taxon_id: int | None,
     specimen_code: str,
     species_text: str | None,
+    species_identification_method: SpeciesIdentificationMethod | str | None,
+    genbank_accession: str | None,
+    taxonomist_name: str | None,
     sex: str | None,
     collection_date: date | None,
     country: str | None,
     locality: str | None,
+    locality_sample_code: str | None,
+    locality_sample_size: int | None,
+    locality_sample_number: int | None,
     latitude: float | None,
     longitude: float | None,
     collector_name: str | None,
@@ -454,21 +583,37 @@ def _build_specimen(
     assignment = _assignment_for_specimen_creation(
         session, actor, assignment_id, taxon_id
     )
-    if collection_date is not None and not isinstance(collection_date, date):
-        raise ValidationError("collection_date must be a date.")
+    method = _species_identification_method(species_identification_method)
+    normalized_genbank, normalized_taxonomist = _species_identification_details(
+        method=method,
+        genbank_accession=genbank_accession,
+        taxonomist_name=taxonomist_name,
+    )
+    sample_code, sample_size, sample_number = _locality_sample_fields(
+        assignment,
+        locality_sample_code=locality_sample_code,
+        locality_sample_size=locality_sample_size,
+        locality_sample_number=locality_sample_number,
+    )
     specimen = Specimen(
         taxon_id=assignment.taxon_id,
         contributor_id=actor.id,
         assignment_id=assignment.id,
         specimen_code=_required_text(specimen_code, "Specimen code", max_length=120),
-        species_text=_optional_text(species_text, "Species", max_length=200),
-        sex=_optional_text(sex, "Sex", max_length=40),
-        collection_date=collection_date,
-        country=_optional_text(country, "Country", max_length=100),
-        locality=_optional_text(locality, "Locality"),
+        species_text=_required_text(species_text or "", "Species identification", max_length=200),
+        species_identification_method=method,
+        genbank_accession=normalized_genbank,
+        taxonomist_name=normalized_taxonomist,
+        sex=_required_text(sex or "", "Sex", max_length=40),
+        collection_date=_required_collection_date(collection_date),
+        country=_required_text(country or "", "Country", max_length=100),
+        locality=_required_text(locality or "", "Locality", max_length=10_000),
+        locality_sample_code=sample_code,
+        locality_sample_size=sample_size,
+        locality_sample_number=sample_number,
         latitude=_optional_coordinate(latitude, "Latitude", -90, 90),
         longitude=_optional_coordinate(longitude, "Longitude", -180, 180),
-        collector_name=_optional_text(collector_name, "Collector", max_length=200),
+        collector_name=_required_text(collector_name or "", "Collector", max_length=200),
         voucher_institution=_optional_text(
             voucher_institution, "Voucher institution", max_length=200
         ),
@@ -487,10 +632,16 @@ def create_specimen(
     assignment_id: int | None = None,
     taxon_id: int | None = None,
     species_text: str | None = None,
+    species_identification_method: SpeciesIdentificationMethod | str | None = None,
+    genbank_accession: str | None = None,
+    taxonomist_name: str | None = None,
     sex: str | None = None,
     collection_date: date | None = None,
     country: str | None = None,
     locality: str | None = None,
+    locality_sample_code: str | None = None,
+    locality_sample_size: int | None = None,
+    locality_sample_number: int | None = None,
     latitude: float | None = None,
     longitude: float | None = None,
     collector_name: str | None = None,
@@ -507,10 +658,16 @@ def create_specimen(
         taxon_id=taxon_id,
         specimen_code=specimen_code,
         species_text=species_text,
+        species_identification_method=species_identification_method,
+        genbank_accession=genbank_accession,
+        taxonomist_name=taxonomist_name,
         sex=sex,
         collection_date=collection_date,
         country=country,
         locality=locality,
+        locality_sample_code=locality_sample_code,
+        locality_sample_size=locality_sample_size,
+        locality_sample_number=locality_sample_number,
         latitude=latitude,
         longitude=longitude,
         collector_name=collector_name,
@@ -522,7 +679,9 @@ def create_specimen(
         session.commit()
     except IntegrityError as exc:
         session.rollback()
-        raise ConflictError("That specimen code is already in use.") from exc
+        raise ConflictError(
+            "That specimen code or locality sample number is already in use."
+        ) from exc
     return specimen
 
 
@@ -676,10 +835,16 @@ def create_specimen_with_image(
     assignment_id: int | None = None,
     taxon_id: int | None = None,
     species_text: str | None = None,
+    species_identification_method: SpeciesIdentificationMethod | str | None = None,
+    genbank_accession: str | None = None,
+    taxonomist_name: str | None = None,
     sex: str | None = None,
     collection_date: date | None = None,
     country: str | None = None,
     locality: str | None = None,
+    locality_sample_code: str | None = None,
+    locality_sample_size: int | None = None,
+    locality_sample_number: int | None = None,
     latitude: float | None = None,
     longitude: float | None = None,
     collector_name: str | None = None,
@@ -696,10 +861,16 @@ def create_specimen_with_image(
         taxon_id=taxon_id,
         specimen_code=specimen_code,
         species_text=species_text,
+        species_identification_method=species_identification_method,
+        genbank_accession=genbank_accession,
+        taxonomist_name=taxonomist_name,
         sex=sex,
         collection_date=collection_date,
         country=country,
         locality=locality,
+        locality_sample_code=locality_sample_code,
+        locality_sample_size=locality_sample_size,
+        locality_sample_number=locality_sample_number,
         latitude=latitude,
         longitude=longitude,
         collector_name=collector_name,
@@ -1381,6 +1552,7 @@ __all__ = [
     "return_annotation",
     "submit_annotation",
     "undo_last_point",
+    "update_template_sample_requirements",
     "validate_annotation_complete",
     "withdraw_submitted_annotation",
 ]

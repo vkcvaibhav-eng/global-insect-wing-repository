@@ -74,13 +74,20 @@ page is not considered a security boundary.
   uppercase `genus_code`. The code is part of permanent accessions and is not
   recomputed from a renamed taxon.
 - **Landmark templates** belong to one taxon and one explicit version. Their
-  ordered **template landmarks** define the required point sequence.
+  ordered **template landmarks** define the required point sequence. Templates
+  also carry locality-sampling guidance: minimum and recommended right-forewing
+  counts for one collection locality. The default is minimum 10 and recommended
+  15 wings.
 - **Assignments** connect one active student to one genus and an exact template
   version. Administrators approve pending account signups, can create
   student/reviewer accounts directly when needed, and assign unassigned
   students. Version 0.1 permits one active assignment per student.
-- **Specimens** contain contributor-supplied collection and voucher metadata
-  and belong to the assigned taxon.
+- **Specimens** contain contributor-supplied collection, species
+  identification, locality sample, and voucher metadata and belong to the
+  assigned taxon. New records require species text, identification method, sex,
+  collection date, country, locality, collector, locality sample code, locality
+  sample size, and the specimen's number within that sample. Notes and voucher
+  fields remain optional.
 - **Wing images** point to preserved original bytes and record their checksum,
   original raster dimensions, MIME type, and the fixed side/type
   `RIGHT`/`FOREWING`. Optional physical scale calibration is stored per image
@@ -93,6 +100,9 @@ page is not considered a security boundary.
   immutable submitted annotation revision.
 - **Repository records** are created only for approved revisions and bind a
   permanent accession to the image, coordinates, taxon, template, and review.
+  Version 0.1 still assigns accessions to approved annotation records, not to a
+  multi-wing locality batch. The locality sample code and sample number preserve
+  the 1..N grouping needed for later batch-level analysis/accessioning.
 - **External reference datasets** and **external reference shapes** represent
   published coordinate sources. They retain source identifiers, coordinates,
   checksums, metadata, DOI/licence provenance, and import timestamps. They are

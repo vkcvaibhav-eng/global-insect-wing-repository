@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from wing_repository.enums import AnnotationStatus, TemplateStatus
+from wing_repository.enums import (
+    AnnotationStatus,
+    SpeciesIdentificationMethod,
+    TemplateStatus,
+)
 from wing_repository.errors import (
     AuthorizationError,
     ConflictError,
@@ -44,6 +50,21 @@ from wing_repository.services import (
 POINTS = ((10.0, 5.0), (20.5, 10.25), (30.0, 15.0))
 
 
+def _required_metadata(specimen_code: str) -> dict[str, object]:
+    return {
+        "species_text": "Apis mellifera",
+        "species_identification_method": SpeciesIdentificationMethod.DICHOTOMOUS_KEY,
+        "sex": "worker",
+        "collection_date": date(2026, 1, 1),
+        "country": "India",
+        "locality": "Test locality",
+        "locality_sample_code": f"{specimen_code}-LOC",
+        "locality_sample_size": 15,
+        "locality_sample_number": 1,
+        "collector_name": "Test Collector",
+    }
+
+
 def _uploaded_image(
     session: Session,
     student: User,
@@ -61,6 +82,7 @@ def _uploaded_image(
         image_bytes=data,
         original_filename="wing.png",
         assignment_id=assignment.id,
+        **_required_metadata(specimen_code),
     )
     return image
 

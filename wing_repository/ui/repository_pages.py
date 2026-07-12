@@ -142,6 +142,11 @@ def _record_table(records: Sequence[RepositoryRecord]) -> pd.DataFrame:
                 "genus": record.taxon.genus,
                 "specimen_code": specimen.specimen_code,
                 "species": specimen.species_text or "",
+                "locality_sample": (
+                    f"{specimen.locality_sample_code or ''} "
+                    f"{specimen.locality_sample_number or ''}/"
+                    f"{specimen.locality_sample_size or ''}"
+                ).strip(),
                 "template_id": annotation.template_id,
                 "template_version": annotation.template.version,
                 "published": record.published_at,
@@ -154,6 +159,7 @@ def _record_table(records: Sequence[RepositoryRecord]) -> pd.DataFrame:
             "genus",
             "specimen_code",
             "species",
+            "locality_sample",
             "template_id",
             "template_version",
             "published",
@@ -200,9 +206,25 @@ def _render_record_detail(record: RepositoryRecord) -> None:
         st.markdown("#### Record metadata")
         st.write(f"**Template:** {_template_label(template)}")
         st.write(f"**Species text:** {specimen.species_text or 'Not supplied'}")
+        st.write(
+            "**Identification method:** "
+            f"{specimen.species_identification_method.value if specimen.species_identification_method else 'Not supplied'}"
+        )
+        if specimen.genbank_accession:
+            st.write(f"**GenBank accession:** {specimen.genbank_accession}")
+        if specimen.taxonomist_name:
+            st.write(f"**Taxonomist:** {specimen.taxonomist_name}")
         st.write(f"**Sex:** {specimen.sex or 'Not supplied'}")
+        st.write(f"**Collection date:** {specimen.collection_date or 'Not supplied'}")
+        st.write(f"**Collector:** {specimen.collector_name or 'Not supplied'}")
         st.write(f"**Country:** {specimen.country or 'Not supplied'}")
         st.write(f"**Locality:** {specimen.locality or 'Not supplied'}")
+        st.write(
+            "**Locality sample:** "
+            f"{specimen.locality_sample_code or 'Not supplied'} "
+            f"{specimen.locality_sample_number or '?'}/"
+            f"{specimen.locality_sample_size or '?'}"
+        )
         st.write(f"**Original filename:** {image.original_filename}")
         st.write(f"**Image SHA-256:** `{image.sha256}`")
         st.write(f"**Image scale:** {format_image_scale(image)}")

@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session, selectinload
 from streamlit_image_coordinates import streamlit_image_coordinates
 
 from wing_repository.coordinates import click_event_token, coordinate_from_click_event
-from wing_repository.enums import AnnotationStatus
+from wing_repository.enums import AnnotationStatus, SpeciesIdentificationMethod
 from wing_repository.errors import NotFoundError, RepositoryError, ValidationError
 from wing_repository.models import (
     Annotation,
@@ -84,6 +84,15 @@ def _assignment_or_notice(session: Session, user: User):
         return None
 
 
+def _species_method_label(method: SpeciesIdentificationMethod) -> str:
+    labels = {
+        SpeciesIdentificationMethod.DICHOTOMOUS_KEY: "Dichotomous key / self",
+        SpeciesIdentificationMethod.TAXONOMIST: "Taxonomist",
+        SpeciesIdentificationMethod.MOLECULAR: "Molecular",
+    }
+    return labels[method]
+
+
 def render_student_dashboard(session: Session, user: User) -> None:
     st.title("Student dashboard")
     assignment = _assignment_or_notice(session, user)
@@ -148,19 +157,72 @@ def render_metadata_form(session: Session, user: User) -> None:
                 max_chars=120,
             )
             species_text = st.text_input(
-                "Species identification (optional)", max_chars=200
+                "Species identification *",
+                help="Example: Apis mellifera.",
+                max_chars=200,
             )
+            species_method = st.selectbox(
+                "How was the species identified? *",
+                [
+                    SpeciesIdentificationMethod.DICHOTOMOUS_KEY,
+                    SpeciesIdentificationMethod.TAXONOMIST,
+                    SpeciesIdentificationMethod.MOLECULAR,
+                ],
+                format_func=_species_method_label,
+            )
+            genbank_accession = None
+            taxonomist_name = None
+            if species_method is SpeciesIdentificationMethod.MOLECULAR:
+                genbank_accession = st.text_input(
+                    "GenBank accession number *",
+                    help="Required for molecular identification.",
+                    max_chars=120,
+                )
+            elif species_method is SpeciesIdentificationMethod.TAXONOMIST:
+                taxonomist_name = st.text_input(
+                    "Taxonomist name *",
+                    help="Required when a taxonomist supplied the identification.",
+                    max_chars=200,
+                )
             sex = st.selectbox(
-                "Sex (optional)",
-                ("", "female", "male", "worker", "queen", "unknown"),
+                "Sex *",
+                ("worker", "female", "male", "queen", "unknown"),
             )
             collection_date = st.date_input(
-                "Collection date (optional)", value=None, max_value=date.today()
+                "Collection date *", value=None, max_value=date.today()
             )
-            collector_name = st.text_input("Collector (optional)", max_chars=200)
+            collector_name = st.text_input("Collector *", max_chars=200)
         with right:
-            country = st.text_input("Country (optional)", max_chars=100)
-            locality = st.text_area("Locality (optional)")
+            country = st.text_input("Country *", max_chars=100)
+            locality = st.text_area("Locality *")
+            st.caption(
+                f"Locality sampling policy: minimum "
+                f"{assignment.template.minimum_wings_per_locality}, advisable "
+                f"{assignment.template.recommended_wings_per_locality} wings."
+            )
+            locality_sample_code = st.text_input(
+                "Locality sample code *",
+                help=(
+                    "One shared code for all wings from the same locality, "
+                    "for example APIS-LOC-001."
+                ),
+                max_chars=120,
+            )
+            locality_sample_size = st.number_input(
+                "Number of wings from this locality *",
+                min_value=assignment.template.minimum_wings_per_locality,
+                value=assignment.template.recommended_wings_per_locality,
+                step=1,
+                help="The minimum is set by the administrator for this template.",
+            )
+            locality_sample_number = st.number_input(
+                "This wing number in that locality sample *",
+                min_value=1,
+                max_value=int(locality_sample_size),
+                value=1,
+                step=1,
+                help="Use 1, 2, 3 ... up to the locality sample count.",
+            )
             coordinate_columns = st.columns(2)
             latitude_text = coordinate_columns[0].text_input(
                 "Latitude", placeholder="e.g. 12.9716"
@@ -182,10 +244,16 @@ def render_metadata_form(session: Session, user: User) -> None:
             specimen_code=specimen_code,
             assignment_id=assignment.id,
             species_text=species_text,
+            species_identification_method=species_method,
+            genbank_accession=genbank_accession,
+            taxonomist_name=taxonomist_name,
             sex=sex,
             collection_date=collection_date,
             country=country,
             locality=locality,
+            locality_sample_code=locality_sample_code,
+            locality_sample_size=int(locality_sample_size),
+            locality_sample_number=int(locality_sample_number),
             latitude=_optional_float(latitude_text, "Latitude"),
             longitude=_optional_float(longitude_text, "Longitude"),
             collector_name=collector_name,
@@ -228,7 +296,10 @@ def render_upload(session: Session, user: User) -> None:
         list(eligible_by_id),
         index=default_index,
         format_func=lambda specimen_id: (
-            f"{eligible_by_id[specimen_id].specimen_code} · "
+            f"{eligible_by_id[specimen_id].specimen_code} | "
+            f"{eligible_by_id[specimen_id].locality_sample_code or 'locality'} "
+            f"{eligible_by_id[specimen_id].locality_sample_number or '?'}"
+            f"/{eligible_by_id[specimen_id].locality_sample_size or '?'} | "
             f"{eligible_by_id[specimen_id].taxon.genus}"
         ),
     )
