@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 import logging
+import re
 
 import streamlit as st
 from sqlalchemy import select
@@ -24,6 +25,17 @@ from wing_repository.ui.navigation import (
 
 PageRenderer = Callable[[Session, User], None]
 logger = logging.getLogger(__name__)
+
+
+def _safe_error_detail(exc: Exception) -> str:
+    """Return a useful database startup error without leaking URL passwords."""
+
+    detail = f"{type(exc).__name__}: {exc}"
+    return re.sub(
+        r"(?P<scheme>postgres(?:ql)?(?:\+\w+)?://[^:\s/@]+):[^@\s]+@",
+        r"\g<scheme>:***@",
+        detail,
+    )
 
 
 def _render_login(session: Session) -> None:
@@ -181,13 +193,14 @@ def run() -> None:
     )
     try:
         schema_ready = ensure_database_ready()
-    except Exception:
+    except Exception as exc:
         logger.exception("Database initialization failed")
         st.error("The configured database could not be initialized.")
         st.code(
             "Check DATABASE_URL and demo bootstrap secrets, then run: "
             "alembic upgrade head"
         )
+        st.code(_safe_error_detail(exc))
         st.stop()
     if not schema_ready:
         st.warning("The database schema has not been created yet.")

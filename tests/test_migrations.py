@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 from alembic import command
 from alembic.config import Config
@@ -11,6 +12,7 @@ from wing_repository.db import build_engine
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+POSTGRES_IDENTIFIER_LIMIT = 63
 
 
 def test_alembic_upgrades_an_empty_sqlite_database_to_head(
@@ -72,3 +74,21 @@ def test_alembic_upgrades_an_empty_sqlite_database_to_head(
             engine.dispose()
     finally:
         get_settings.cache_clear()
+
+
+def test_migration_identifiers_fit_postgresql_limit() -> None:
+    migration_paths = sorted((PROJECT_ROOT / "alembic" / "versions").glob("*.py"))
+    assert migration_paths
+
+    too_long: list[str] = []
+    for migration_path in migration_paths:
+        migration_text = migration_path.read_text(encoding="utf-8")
+        names = set(re.findall(r'op\.f\("([^"]+)"\)', migration_text))
+        names.update(re.findall(r'name="([^"]+)"', migration_text))
+        too_long.extend(
+            f"{migration_path.name}: {name} ({len(name)})"
+            for name in sorted(names)
+            if len(name) > POSTGRES_IDENTIFIER_LIMIT
+        )
+
+    assert too_long == []
