@@ -40,7 +40,7 @@ The modules have intentionally narrow responsibilities:
 
 | Page | Student | Reviewer | Administrator |
 |---|---:|---:|---:|
-| Login | Yes | Yes | Yes |
+| Login and student signup request | Yes | Yes | Yes |
 | Student dashboard | Yes | No | No |
 | Specimen metadata | Yes | No | No |
 | Wing-image upload | Yes | No | No |
@@ -57,14 +57,17 @@ page is not considered a security boundary.
 ## Core data model
 
 - **Users** have exactly one role: administrator, student, or expert reviewer.
+  Student self-signup creates an inactive student row; administrator approval
+  switches the account active before login or assignment.
 - **Taxa** are genus-level Hymenoptera records with a stable, manually assigned
   uppercase `genus_code`. The code is part of permanent accessions and is not
   recomputed from a renamed taxon.
 - **Landmark templates** belong to one taxon and one explicit version. Their
   ordered **template landmarks** define the required point sequence.
-- **Assignments** connect one student to one genus and an exact template
-  version. Administrators can create student/reviewer accounts and assign
-  unassigned students. Version 0.1 permits one active assignment per student.
+- **Assignments** connect one active student to one genus and an exact template
+  version. Administrators approve pending student signups, can create
+  student/reviewer accounts directly when needed, and assign unassigned
+  students. Version 0.1 permits one active assignment per student.
 - **Specimens** contain contributor-supplied collection and voucher metadata
   and belong to the assigned taxon.
 - **Wing images** point to preserved original bytes and record their checksum,

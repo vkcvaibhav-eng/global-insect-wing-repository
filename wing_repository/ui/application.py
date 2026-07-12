@@ -16,6 +16,7 @@ from wing_repository.enums import Role
 from wing_repository.errors import RepositoryError, ValidationError
 from wing_repository.models import User
 from wing_repository.security import normalize_email, verify_password
+from wing_repository.services import request_student_signup
 
 PageRenderer = Callable[[Session, User], None]
 logger = logging.getLogger(__name__)
@@ -25,8 +26,9 @@ def _render_login(session: Session) -> None:
     st.title("Global Insect Wing Repository")
     st.caption("Version 0.1 · Hymenoptera · right forewing manual digitization")
     st.info(
-        "Sign in with an account created by the demonstration seed or an "
-        "administrator. Credentials are never embedded in the application."
+        "Sign in with an approved account, or request a student account below. "
+        "Student signup uses email/password in Version 0.1; administrators "
+        "must approve accounts before login."
     )
     if get_settings().auto_bootstrap_demo:
         settings = get_settings()
@@ -40,27 +42,73 @@ def _render_login(session: Session) -> None:
                 "Demo bootstrap is enabled for startup provisioning. After the "
                 "first successful run, set WBR_AUTO_BOOTSTRAP_DEMO to false."
             )
-    with st.form("login_form", clear_on_submit=False):
-        email = st.text_input("Email", autocomplete="email")
-        password = st.text_input(
-            "Password", type="password", autocomplete="current-password"
+    sign_in_tab, signup_tab = st.tabs(["Sign in", "Student signup request"])
+    with sign_in_tab:
+        with st.form("login_form", clear_on_submit=False):
+            email = st.text_input("Email", autocomplete="email")
+            password = st.text_input(
+                "Password", type="password", autocomplete="current-password"
+            )
+            submitted = st.form_submit_button("Sign in", type="primary")
+        if submitted:
+            try:
+                normalized_email = normalize_email(email)
+            except ValidationError as exc:
+                st.error(str(exc))
+                return
+            user = session.scalar(
+                select(User).where(
+                    User.email == normalized_email,
+                    User.is_active.is_(True),
+                )
+            )
+            if user is None or not verify_password(password, user.password_hash):
+                st.error("Email or password is incorrect.")
+                return
+            st.session_state["wbr_user_id"] = user.id
+            st.rerun()
+
+    with signup_tab:
+        st.caption(
+            "Students may request their own account with a Gmail or institutional "
+            "email. The account remains pending until an administrator approves it."
         )
-        submitted = st.form_submit_button("Sign in", type="primary")
-    if not submitted:
-        return
-    try:
-        normalized_email = normalize_email(email)
-    except ValidationError as exc:
-        st.error(str(exc))
-        return
-    user = session.scalar(
-        select(User).where(User.email == normalized_email, User.is_active.is_(True))
-    )
-    if user is None or not verify_password(password, user.password_hash):
-        st.error("Email or password is incorrect.")
-        return
-    st.session_state["wbr_user_id"] = user.id
-    st.rerun()
+        with st.form("student_signup_form", clear_on_submit=True):
+            signup_name = st.text_input("Full name")
+            signup_email = st.text_input("Email", autocomplete="email")
+            signup_password = st.text_input(
+                "Password",
+                type="password",
+                autocomplete="new-password",
+                help="Use at least 12 characters.",
+            )
+            signup_password_confirm = st.text_input(
+                "Confirm password",
+                type="password",
+                autocomplete="new-password",
+            )
+            signup_submitted = st.form_submit_button(
+                "Request student account",
+                type="primary",
+            )
+        if signup_submitted:
+            if signup_password != signup_password_confirm:
+                st.error("Passwords do not match.")
+                return
+            try:
+                request_student_signup(
+                    session,
+                    email=signup_email,
+                    full_name=signup_name,
+                    password=signup_password,
+                )
+            except RepositoryError as exc:
+                st.error(str(exc))
+                return
+            st.success(
+                "Signup request created. An administrator must approve the "
+                "account before you can sign in."
+            )
 
 
 def _active_user(session: Session) -> User | None:

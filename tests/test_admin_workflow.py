@@ -5,10 +5,106 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from wing_repository.enums import Role
-from wing_repository.errors import AuthorizationError, ConflictError, ValidationError
+from wing_repository.errors import (
+    AuthenticationError,
+    AuthorizationError,
+    ConflictError,
+    ValidationError,
+)
 from wing_repository.models import User
 from wing_repository.security import verify_password
-from wing_repository.services import create_user_account
+from wing_repository.services import (
+    approve_user_account,
+    authenticate_user,
+    create_user_account,
+    request_student_signup,
+)
+
+
+def test_student_signup_creates_pending_inactive_account(
+    db_session: Session,
+) -> None:
+    created = request_student_signup(
+        db_session,
+        email=" Student.Signup@Gmail.COM ",
+        full_name=" Student Signup ",
+        password="student-signup-password-2026",
+    )
+
+    assert created.id is not None
+    assert created.email == "student.signup@gmail.com"
+    assert created.full_name == "Student Signup"
+    assert created.role is Role.STUDENT
+    assert not created.is_active
+    assert verify_password("student-signup-password-2026", created.password_hash)
+
+
+def test_pending_student_signup_cannot_authenticate_until_approved(
+    db_session: Session,
+    administrator: User,
+) -> None:
+    pending = request_student_signup(
+        db_session,
+        email="waiting.student@example.test",
+        full_name="Waiting Student",
+        password="waiting-password-2026",
+    )
+
+    with pytest.raises(AuthenticationError):
+        authenticate_user(
+            db_session,
+            "waiting.student@example.test",
+            "waiting-password-2026",
+        )
+
+    approved = approve_user_account(
+        db_session,
+        administrator,
+        user_id=pending.id,
+    )
+    assert approved.is_active
+    authenticated = authenticate_user(
+        db_session,
+        "waiting.student@example.test",
+        "waiting-password-2026",
+    )
+    assert authenticated.id == pending.id
+
+
+def test_non_administrator_cannot_approve_student_signup(
+    db_session: Session,
+    student: User,
+) -> None:
+    pending = request_student_signup(
+        db_session,
+        email="approval.blocked@example.test",
+        full_name="Approval Blocked",
+        password="approval-password-2026",
+    )
+
+    with pytest.raises(AuthorizationError):
+        approve_user_account(
+            db_session,
+            student,
+            user_id=pending.id,
+        )
+
+
+def test_student_signup_email_must_be_unique(db_session: Session) -> None:
+    request_student_signup(
+        db_session,
+        email="duplicate.signup@example.test",
+        full_name="Duplicate Signup",
+        password="signup-password-2026",
+    )
+
+    with pytest.raises(ConflictError, match="email"):
+        request_student_signup(
+            db_session,
+            email=" DUPLICATE.SIGNUP@example.test ",
+            full_name="Duplicate Signup Again",
+            password="signup-password-2027",
+        )
 
 
 def test_administrator_can_create_student_account(

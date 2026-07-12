@@ -11,16 +11,20 @@ cross-template morphometric comparison.
 
 ## Implemented workflow
 
-1. An administrator creates student/reviewer accounts and assigns each student
-   to one genus and one exact landmark template version.
-2. The student records specimen metadata and uploads a right-forewing image.
-3. The student places the template's numbered landmarks and submits a complete
+1. A student requests an account from the login page using their email address
+   and password. The account remains inactive until an administrator approves
+   it. Administrators can still create student/reviewer accounts directly when
+   needed.
+2. An administrator assigns each approved student to one genus and one exact
+   landmark template version.
+3. The student records specimen metadata and uploads a right-forewing image.
+4. The student places the template's numbered landmarks and submits a complete
    immutable annotation revision.
-4. An expert approves it or returns it with comments. Returned work is cloned
+5. An expert approves it or returns it with comments. Returned work is cloned
    into a new editable revision; the reviewed coordinates remain preserved.
-5. Approval atomically creates a permanent accession such as
+6. Approval atomically creates a permanent accession such as
    `WBR-HYM-APIS-000001`.
-6. Repository and export pages expose approved records only. CSV and TPS export
+7. Repository and export pages expose approved records only. CSV and TPS export
    always target one exact template version.
 
 See [the architecture](docs/ARCHITECTURE.md) and
@@ -75,6 +79,11 @@ the passwords supplied through environment variables:
 
 The demonstration image is a generated schematic and is not a taxonomic
 reference specimen.
+
+Students may also request their own account from the first page of the app
+using an email address such as a Gmail address. Version 0.1 does not implement
+Google OAuth or email verification; administrator approval is required before
+the new account can sign in.
 
 ## Run
 

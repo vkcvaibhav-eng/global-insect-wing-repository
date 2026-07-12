@@ -16,6 +16,7 @@ from wing_repository.models import (
     User,
 )
 from wing_repository.services import (
+    approve_user_account,
     create_assignment,
     create_user_account,
     deactivate_assignment,
@@ -46,6 +47,20 @@ def _assignment_rows(assignments: list[Assignment]) -> pd.DataFrame:
     )
 
 
+def _pending_user_rows(users: list[User]) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "user_id": pending_user.id,
+                "full_name": pending_user.full_name,
+                "email": pending_user.email,
+                "requested_at": pending_user.created_at,
+            }
+            for pending_user in users
+        ]
+    )
+
+
 def render_administration(session: Session, user: User) -> None:
     st.title("Administration")
     st.caption(
@@ -69,10 +84,50 @@ def render_administration(session: Session, user: User) -> None:
     )
     metrics[3].metric("Approved records", _count(session, RepositoryRecord))
 
+    st.subheader("Approve student signups")
+    pending_students = list(
+        session.scalars(
+            select(User)
+            .where(
+                User.role == Role.STUDENT,
+                User.is_active.is_(False),
+            )
+            .order_by(User.created_at.asc(), User.id.asc())
+        )
+    )
+    if not pending_students:
+        st.info("No student signup requests are waiting for approval.")
+    else:
+        st.dataframe(
+            _pending_user_rows(pending_students),
+            hide_index=True,
+            width="stretch",
+        )
+        pending_by_id = {
+            pending_user.id: pending_user for pending_user in pending_students
+        }
+        selected_pending_id = st.selectbox(
+            "Pending student to approve",
+            list(pending_by_id),
+            format_func=lambda user_id: (
+                f"{pending_by_id[user_id].full_name} · "
+                f"{pending_by_id[user_id].email}"
+            ),
+        )
+        if st.button("Approve selected student", type="primary"):
+            approved = approve_user_account(
+                session,
+                user,
+                user_id=selected_pending_id,
+            )
+            st.toast(f"Approved {approved.email}.")
+            st.rerun()
+
     st.subheader("Create user account")
     st.caption(
-        "Create a student before assigning a genus/template. Share temporary "
-        "passwords outside the app; Version 0.1 does not send email."
+        "Optional fallback for administrators: create a student or reviewer "
+        "directly. Share temporary passwords outside the app; Version 0.1 does "
+        "not send email."
     )
     with st.form("create_user_form", clear_on_submit=True):
         new_full_name = st.text_input("Full name")

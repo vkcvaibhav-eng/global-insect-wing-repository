@@ -124,6 +124,62 @@ def authenticate_user(session: Session, email: str, password: str) -> User:
     return user
 
 
+def _validated_account_password(password: str, label: str = "Password") -> str:
+    if not isinstance(password, str) or len(password) < MIN_ACCOUNT_PASSWORD_CHARACTERS:
+        raise ValidationError(
+            f"{label} must be at least {MIN_ACCOUNT_PASSWORD_CHARACTERS} characters."
+        )
+    return password
+
+
+def request_student_signup(
+    session: Session,
+    *,
+    email: str,
+    full_name: str,
+    password: str,
+) -> User:
+    """Create an inactive student account request for administrator approval."""
+
+    normalized_email = normalize_email(email)
+    normalized_name = _required_text(full_name, "Full name", max_length=200)
+    user = User(
+        email=normalized_email,
+        full_name=normalized_name,
+        password_hash=hash_password(_validated_account_password(password)),
+        role=Role.STUDENT,
+        is_active=False,
+    )
+    session.add(user)
+    try:
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        raise ConflictError("An account already exists for that email.") from exc
+    return user
+
+
+def approve_user_account(
+    session: Session,
+    actor: User,
+    *,
+    user_id: int,
+) -> User:
+    """Activate a pending student/reviewer account as an administrator."""
+
+    require_active_role(actor, Role.ADMINISTRATOR)
+    account = session.get(User, user_id)
+    if account is None:
+        raise NotFoundError("The requested account was not found.")
+    if account.role not in {Role.STUDENT, Role.EXPERT_REVIEWER}:
+        raise ValidationError("Only student or reviewer accounts can be approved.")
+    if account.is_active:
+        return account
+    account.is_active = True
+    session.commit()
+    return account
+
+
 def create_user_account(
     session: Session,
     actor: User,
@@ -142,15 +198,12 @@ def create_user_account(
         )
     normalized_email = normalize_email(email)
     normalized_name = _required_text(full_name, "Full name", max_length=200)
-    if not isinstance(password, str) or len(password) < MIN_ACCOUNT_PASSWORD_CHARACTERS:
-        raise ValidationError(
-            f"Temporary password must be at least "
-            f"{MIN_ACCOUNT_PASSWORD_CHARACTERS} characters."
-        )
     user = User(
         email=normalized_email,
         full_name=normalized_name,
-        password_hash=hash_password(password),
+        password_hash=hash_password(
+            _validated_account_password(password, "Temporary password")
+        ),
         role=role,
         is_active=True,
     )
@@ -1024,6 +1077,7 @@ def list_repository_records(session: Session, actor: User) -> list[RepositoryRec
 
 __all__ = [
     "approve_annotation",
+    "approve_user_account",
     "attach_wing_image",
     "authenticate_user",
     "clone_returned_annotation",
@@ -1040,6 +1094,7 @@ __all__ = [
     "list_submitted_annotations",
     "place_annotation_point",
     "require_active_role",
+    "request_student_signup",
     "return_annotation",
     "submit_annotation",
     "undo_last_point",

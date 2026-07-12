@@ -24,8 +24,11 @@
 11. CSV and TPS exports contain approved repository records only and are split
     or filtered by one exact landmark-template version. Cross-version export is
     rejected rather than combined automatically.
-12. Authentication is suitable for a local milestone demonstration. Production
+12. Student self-signup uses email/password only. Version 0.1 does not send
+    verification email or implement Google OAuth; administrator approval is the
+    account activation gate.
+13. Authentication is suitable for a local milestone demonstration. Production
     deployment requires HTTPS, institutional account lifecycle controls,
     rate-limiting, session hardening, backups, and security review.
-13. Machine learning, automated landmark detection, WingSearch, generalized
+14. Machine learning, automated landmark detection, WingSearch, generalized
     Procrustes analysis, and PCA are outside Version 0.1.
