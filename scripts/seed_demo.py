@@ -427,6 +427,35 @@ def seed_demo(session: Session) -> dict[str, str]:
     }
 
 
+def seed_demo_accounts(session: Session, *, reset_passwords: bool = False) -> dict[str, str]:
+    """Create or update only the three demo login accounts.
+
+    This lighter bootstrap path is used for an existing hosted database when
+    operators need to recover demo passwords. It deliberately avoids touching
+    image storage, annotations, or repository records.
+    """
+
+    passwords = _required_passwords()
+    account_states: dict[Role, str] = {}
+    for role in (
+        Role.ADMINISTRATOR,
+        Role.STUDENT,
+        Role.EXPERT_REVIEWER,
+    ):
+        _account, state = _ensure_user(
+            session,
+            role=role,
+            password=passwords[role],
+            reset_password=reset_passwords,
+        )
+        account_states[role] = state
+    return {
+        "administrator": account_states[Role.ADMINISTRATOR],
+        "student": account_states[Role.STUDENT],
+        "reviewer": account_states[Role.EXPERT_REVIEWER],
+    }
+
+
 def main() -> None:
     load_dotenv()
     if not inspect(engine).has_table("users"):
