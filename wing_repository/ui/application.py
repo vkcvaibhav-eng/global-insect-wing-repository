@@ -17,6 +17,10 @@ from wing_repository.errors import RepositoryError, ValidationError
 from wing_repository.models import User
 from wing_repository.security import normalize_email, verify_password
 from wing_repository.services import request_student_signup
+from wing_repository.ui.navigation import (
+    CURRENT_PAGE_KEY,
+    apply_queued_page_navigation,
+)
 
 PageRenderer = Callable[[Session, User], None]
 logger = logging.getLogger(__name__)
@@ -195,10 +199,14 @@ def run() -> None:
         st.sidebar.caption(f"Signed in as {user.full_name}")
         st.sidebar.caption(user.role.value.replace("_", " ").title())
         pages = _page_map(user.role)
-        if st.session_state.get("wbr_page") not in pages:
-            st.session_state["wbr_page"] = next(iter(pages))
+        apply_queued_page_navigation(pages, st.session_state)
+        if st.session_state.get(CURRENT_PAGE_KEY) not in pages:
+            st.session_state[CURRENT_PAGE_KEY] = next(iter(pages))
         selected_page = st.sidebar.radio(
-            "Navigation", list(pages), key="wbr_page", label_visibility="collapsed"
+            "Navigation",
+            list(pages),
+            key=CURRENT_PAGE_KEY,
+            label_visibility="collapsed",
         )
         if st.sidebar.button("Sign out", width="stretch"):
             st.session_state.clear()

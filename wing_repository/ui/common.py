@@ -11,6 +11,7 @@ import streamlit as st
 from wing_repository.config import get_settings
 from wing_repository.image_store import ImageStore, image_store_from_settings
 from wing_repository.models import Annotation
+from wing_repository.ui.navigation import move_to_page
 from wing_repository.ui.image_overlay import OverlayPoint, build_numbered_overlay
 
 
@@ -135,10 +136,3 @@ def format_image_scale(image: Any) -> str:
         f"{image.scale_mm_per_pixel:.8g} mm/pixel "
         f"({1 / image.scale_mm_per_pixel:.3f} pixels/mm)"
     )
-
-
-def move_to_page(page_name: str) -> None:
-    """Select another role-visible page on the next Streamlit run."""
-
-    st.session_state["wbr_page"] = page_name
-    st.rerun()
