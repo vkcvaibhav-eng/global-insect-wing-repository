@@ -37,7 +37,10 @@ from wing_repository.models import (
     User,
     WingAnalysisRun,
 )
-from wing_repository.morphometrics.artifacts import load_pickle_artifact, save_pickle_artifact
+from wing_repository.morphometrics.artifacts import (
+    load_configured_pickle_artifact,
+    save_configured_pickle_artifact,
+)
 from wing_repository.morphometrics.classification import ranked_probability_results
 from wing_repository.morphometrics.consensus import flatten_shapes, sample_mean_shapes
 from wing_repository.morphometrics.cva import (
@@ -68,14 +71,46 @@ NAWROCKA_CITATION = (
     "Nawrocka, A., Kandemir, I., Fuchs, S. and Tofilski, A. (2018). "
     "Dataset DOI: 10.5281/zenodo.7567336."
 )
+KAUR_INDIA_CITATION = (
+    "Kaur, H., Ganie, S. A. and Tofilski, A. (2023). Fore wings of honey bees "
+    "(Apis mellifera) from Jammu and Kashmir, India. Dataset DOI: "
+    "10.5281/zenodo.8071014."
+)
+SOUTHWEST_ASIA_CITATION = (
+    "Machlowska, J. et al. (2025). Fore wings of honey bees (Apis mellifera) "
+    "from southwestern Asia. Dataset DOI: 10.5281/zenodo.17075125; "
+    "Scientific Data DOI: 10.1038/s41597-025-06234-8."
+)
+KAZAKHSTAN_CITATION = (
+    "Temirbayeva, K. et al. (2023). Fore wings of honey bees (Apis mellifera) "
+    "from Kazakhstan. Dataset DOI: 10.5281/zenodo.8128010; "
+    "Life DOI: 10.3390/life13091860."
+)
+SERBIA_CITATION = (
+    "Kaur, H., Nedic, N. and Tofilski, A. (2023). Fore wing images of honey "
+    "bees (Apis mellifera) from Serbia. Dataset DOI: 10.5281/zenodo.10389960."
+)
+MEXICO_CITATION = (
+    "Payro de la Cruz, E., Valencia Dominguez, M., Ramos Reyes, R. and "
+    "Tofilski, A. (2024). Fore wings of honey bees (Apis mellifera) from "
+    "Tabasco, Mexico. Dataset DOI: 10.5281/zenodo.13884732."
+)
+NORTHWESTERN_EUROPE_CITATION = (
+    "Machlowska, J. et al. (2026). Fore wings of honey bees (Apis mellifera) "
+    "from northwestern Europe. Dataset DOI: 10.5281/zenodo.18845767."
+)
+ALGERIA_CITATION = (
+    "Yamina, H. and Tofilski, A. (2026). Fore wing images of honey bees "
+    "(Apis mellifera) from Algeria 2025. Dataset DOI: 10.5281/zenodo.18360081."
+)
 WORKFLOW_CITATION = "Workflow DOI: 10.48546/workflowhub.workflow.422.1."
 SINGLE_WING_WARNING = (
     "Results from a single wing are less reliable than results based on the "
     "mean shape of multiple workers from one colony or locality."
 )
 NO_REGION_MATCH_WARNING = (
-    "No reliable geographical reference match within the current European "
-    "reference dataset."
+    "No reliable geographical reference match within the current published "
+    "reference datasets."
 )
 
 
@@ -155,8 +190,8 @@ def active_analysis_model(session: Session, analysis_type: AnalysisType) -> Anal
 def _load_model_payload(model: AnalysisModel) -> dict[str, Any]:
     if model.artifact_storage_key is None or model.artifact_sha256 is None:
         raise InvalidStateError("The active analysis model has no artifact.")
-    return load_pickle_artifact(
-        root=get_settings().analysis_artifact_dir,
+    return load_configured_pickle_artifact(
+        settings=get_settings(),
         storage_key=model.artifact_storage_key,
         expected_sha256=model.artifact_sha256,
     )
@@ -275,7 +310,12 @@ def save_reference_payload_models(
     """Persist one artifact and three validated model records."""
 
     storage_key = f"apis_reference/v{model_version}/model.pkl"
-    stored = save_pickle_artifact(payload, root=artifact_root, storage_key=storage_key)
+    stored = save_configured_pickle_artifact(
+        payload,
+        settings=get_settings(),
+        local_root=artifact_root,
+        storage_key=storage_key,
+    )
     validation_metrics = payload.get("validation_metrics", {})
     source_hashes = payload.get("source_hashes", {})
     preprocessing = payload.get("preprocessing", {})
@@ -519,10 +559,17 @@ def published_shape_match_rows(run: WingAnalysisRun) -> list[dict[str, Any]]:
 
 
 __all__ = [
+    "ALGERIA_CITATION",
+    "KAUR_INDIA_CITATION",
+    "KAZAKHSTAN_CITATION",
+    "MEXICO_CITATION",
+    "NORTHWESTERN_EUROPE_CITATION",
     "NAWROCKA_CITATION",
     "NO_REGION_MATCH_WARNING",
     "OLEKSA_CITATION",
+    "SERBIA_CITATION",
     "SINGLE_WING_WARNING",
+    "SOUTHWEST_ASIA_CITATION",
     "WORKFLOW_CITATION",
     "activate_validated_models",
     "active_analysis_model",

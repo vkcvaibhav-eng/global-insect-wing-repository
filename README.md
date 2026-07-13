@@ -117,7 +117,8 @@ For a persistent hosted repository, keep Streamlit Cloud for the app but move
 state out of Streamlit's ephemeral filesystem:
 
 1. Create a Neon or Supabase PostgreSQL database.
-2. Create a Cloudflare R2 bucket for original wing-image uploads.
+2. Create a Cloudflare R2 bucket for original wing-image uploads and hosted
+   analysis artifacts.
 3. Add R2 API credentials with object read/write access to that bucket.
 4. Configure Streamlit Cloud secrets with a PostgreSQL `DATABASE_URL` and
    `WBR_STORAGE_BACKEND = "r2"`.
@@ -132,6 +133,8 @@ $env:WBR_R2_BUCKET_NAME = "wing-originals"
 $env:WBR_R2_ACCESS_KEY_ID = "<r2-access-key-id>"
 $env:WBR_R2_SECRET_ACCESS_KEY = "<r2-secret-access-key>"
 $env:WBR_R2_KEY_PREFIX = "originals/"
+$env:WBR_ANALYSIS_ARTIFACT_BACKEND = "r2"
+$env:WBR_ANALYSIS_ARTIFACT_R2_PREFIX = "analysis-artifacts/"
 alembic upgrade head
 streamlit run app.py
 ```
@@ -190,10 +193,13 @@ specimens and never receive `WBR-HYM-*` accessions. The module expects local
 copies of the published datasets; it does not download research data during
 Streamlit startup.
 
-The code is updated, but the analysis is not yet automatically active. It still
-requires:
+The code can run the analysis after the reference coordinates are imported,
+the Version 2 Apis template is published, and a model artifact is built and
+activated. It requires:
 
-1. Downloading the Oleksa, Nawrocka and WorkflowHub reference files.
+1. Downloading the Oleksa, Kaur India, Southwest Asia, Kazakhstan, Serbia,
+   Mexico, Northwestern Europe, Algeria and Nawrocka coordinate files, plus the
+   WorkflowHub RO-Crate for method provenance.
 2. Running the database migration.
 3. Importing the coordinates.
 4. Validating the imported data.
@@ -205,15 +211,60 @@ Configure local source directories and an artifact directory:
 ```powershell
 $env:WBR_OLEKSA_REFERENCE_DIR = "C:\reference-data\oleksa-zenodo-7244070"
 $env:WBR_NAWROCKA_REFERENCE_DIR = "C:\reference-data\nawrocka-zenodo-7567336"
+$env:WBR_KAUR_INDIA_REFERENCE_DIR = "C:\reference-data\kaur-india-zenodo-8071014"
+$env:WBR_SOUTHWEST_ASIA_REFERENCE_DIR = "C:\reference-data\southwest-asia-zenodo-17075125"
+$env:WBR_KAZAKHSTAN_REFERENCE_DIR = "C:\reference-data\kazakhstan-zenodo-8128010"
+$env:WBR_SERBIA_REFERENCE_DIR = "C:\reference-data\serbia-zenodo-10389960"
+$env:WBR_MEXICO_REFERENCE_DIR = "C:\reference-data\mexico-tabasco-zenodo-13884732"
+$env:WBR_NORTHWESTERN_EUROPE_REFERENCE_DIR = "C:\reference-data\northwestern-europe-zenodo-18845767"
+$env:WBR_ALGERIA_REFERENCE_DIR = "C:\reference-data\algeria-zenodo-18360081"
+$env:WBR_QUEENS_DRONES_REFERENCE_DIR = "C:\reference-data\queens-drones-zenodo-8396176"
 $env:WBR_APIS_WORKFLOW_DIR = "C:\reference-data\workflowhub-422"
 $env:WBR_ANALYSIS_ARTIFACT_DIR = "data\analysis-artifacts"
 ```
+
+For hosted Streamlit deployments, upload the built artifact to Cloudflare R2
+and set `WBR_ANALYSIS_ARTIFACT_BACKEND = "r2"`. With the default prefix, a
+database artifact key of `apis_reference/v1/model.pkl` is loaded from the R2
+object key `analysis-artifacts/apis_reference/v1/model.pkl`.
+
+Source roles:
+
+| Source | Role in the app | Contains wing coordinates? |
+|---|---|---|
+| Oleksa et al., Zenodo `10.5281/zenodo.7244070` | European geographical/region affinity and closest published shapes | Yes |
+| Kaur, Ganie and Tofilski, Zenodo `10.5281/zenodo.8071014` | Jammu and Kashmir, India geographical/nearest-shape reference | Yes |
+| Machlowska et al., Zenodo `10.5281/zenodo.17075125` | Southwestern Asia worker geographical/nearest-shape reference | Yes |
+| Temirbayeva et al., Zenodo `10.5281/zenodo.8128010` | Kazakhstan worker geographical/nearest-shape reference | Yes |
+| Kaur, Nedic and Tofilski, Zenodo `10.5281/zenodo.10389960` | Serbia worker geographical/nearest-shape reference | Yes |
+| Payro de la Cruz et al., Zenodo `10.5281/zenodo.13884732` | Tabasco, Mexico worker geographical/nearest-shape reference | Yes |
+| Machlowska et al., Zenodo `10.5281/zenodo.18845767` | Northwestern Europe worker geographical/nearest-shape reference | Yes |
+| Yamina and Tofilski, Zenodo `10.5281/zenodo.18360081` | Algeria worker geographical/nearest-shape reference | Yes |
+| Nawrocka et al., Zenodo `10.5281/zenodo.7567336` | A, C, M and O lineage-affinity reference | Yes |
+| Tofilski, Kaur and Łopuch, Zenodo `10.5281/zenodo.8396176` | Queen/drone caste reference coordinates; excluded from worker analysis models by default | Yes |
+| WorkflowHub `10.48546/workflowhub.workflow.422.1` | Published R-analysis procedure for GPA, averaging, CVA and classification | No new biological reference collection; it is the workflow |
 
 Inspect and import:
 
 ```powershell
 python -m wing_repository.reference_data inspect-oleksa
 python -m wing_repository.reference_data import-oleksa
+python -m wing_repository.reference_data inspect-kaur-india
+python -m wing_repository.reference_data import-kaur-india
+python -m wing_repository.reference_data inspect-southwest-asia
+python -m wing_repository.reference_data import-southwest-asia
+python -m wing_repository.reference_data inspect-kazakhstan
+python -m wing_repository.reference_data import-kazakhstan
+python -m wing_repository.reference_data inspect-serbia
+python -m wing_repository.reference_data import-serbia
+python -m wing_repository.reference_data inspect-mexico
+python -m wing_repository.reference_data import-mexico
+python -m wing_repository.reference_data inspect-northwestern-europe
+python -m wing_repository.reference_data import-northwestern-europe
+python -m wing_repository.reference_data inspect-algeria
+python -m wing_repository.reference_data import-algeria
+python -m wing_repository.reference_data inspect-queens-drones
+python -m wing_repository.reference_data import-queens-drones
 python -m wing_repository.reference_data inspect-nawrocka
 python -m wing_repository.reference_data import-nawrocka
 python -m wing_repository.reference_data validate-import
@@ -269,8 +320,18 @@ transform safeguards are documented in `docs/ARCHITECTURE.md`.
 | `WBR_R2_ACCESS_KEY_ID` | R2 access key ID | none |
 | `WBR_R2_SECRET_ACCESS_KEY` | R2 secret access key | none |
 | `WBR_R2_KEY_PREFIX` | Prefix for newly uploaded R2 objects | `originals/` |
+| `WBR_ANALYSIS_ARTIFACT_BACKEND` | Model artifact store: `local` or `r2` | `local` |
+| `WBR_ANALYSIS_ARTIFACT_R2_PREFIX` | R2 prefix for hosted model artifacts | `analysis-artifacts/` |
 | `WBR_OLEKSA_REFERENCE_DIR` | Local Oleksa/Zenodo 7244070 source directory | none |
 | `WBR_NAWROCKA_REFERENCE_DIR` | Local Nawrocka/Zenodo 7567336 source directory | none |
+| `WBR_KAUR_INDIA_REFERENCE_DIR` | Local Kaur India/Zenodo 8071014 coordinate source directory | none |
+| `WBR_SOUTHWEST_ASIA_REFERENCE_DIR` | Local Southwest Asia/Zenodo 17075125 coordinate source directory | none |
+| `WBR_KAZAKHSTAN_REFERENCE_DIR` | Local Kazakhstan/Zenodo 8128010 coordinate source directory | none |
+| `WBR_SERBIA_REFERENCE_DIR` | Local Serbia/Zenodo 10389960 coordinate source directory | none |
+| `WBR_MEXICO_REFERENCE_DIR` | Local Mexico/Zenodo 13884732 coordinate source directory | none |
+| `WBR_NORTHWESTERN_EUROPE_REFERENCE_DIR` | Local Northwestern Europe/Zenodo 18845767 coordinate source directory | none |
+| `WBR_ALGERIA_REFERENCE_DIR` | Local Algeria/Zenodo 18360081 coordinate source directory | none |
+| `WBR_QUEENS_DRONES_REFERENCE_DIR` | Local queen/drone Zenodo 8396176 coordinate source directory | none |
 | `WBR_APIS_WORKFLOW_DIR` | Local WorkflowHub 422 workflow directory | none |
 | `WBR_ANALYSIS_ARTIFACT_DIR` | Versioned model artifact directory | `data/analysis-artifacts` |
 
@@ -291,6 +352,8 @@ WBR_R2_BUCKET_NAME = "wing-originals"
 WBR_R2_ACCESS_KEY_ID = "<r2-access-key-id>"
 WBR_R2_SECRET_ACCESS_KEY = "<r2-secret-access-key>"
 WBR_R2_KEY_PREFIX = "originals/"
+WBR_ANALYSIS_ARTIFACT_BACKEND = "r2"
+WBR_ANALYSIS_ARTIFACT_R2_PREFIX = "analysis-artifacts/"
 WBR_BOOTSTRAP_ADMIN_EMAIL = "curator@institute.edu"
 WBR_BOOTSTRAP_ADMIN_FULL_NAME = "Institute Curator"
 WBR_BOOTSTRAP_ADMIN_PASSWORD = "choose-a-distinct-long-password"

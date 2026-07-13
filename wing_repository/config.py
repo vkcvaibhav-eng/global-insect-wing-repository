@@ -20,6 +20,7 @@ DEFAULT_DATA_DIR = Path("data")
 DEFAULT_MAX_UPLOAD_MB = 25
 DEFAULT_BOOTSTRAP_ADMIN_RESET_PASSWORD = False
 DEFAULT_STORAGE_BACKEND = "local"
+DEFAULT_ANALYSIS_ARTIFACT_BACKEND = "local"
 
 
 def _normalize_database_url(value: str) -> str:
@@ -60,8 +61,18 @@ class Settings:
     r2_key_prefix: str = "originals/"
     oleksa_reference_dir: Path | None = None
     nawrocka_reference_dir: Path | None = None
+    kaur_india_reference_dir: Path | None = None
+    southwest_asia_reference_dir: Path | None = None
+    kazakhstan_reference_dir: Path | None = None
+    serbia_reference_dir: Path | None = None
+    mexico_reference_dir: Path | None = None
+    northwestern_europe_reference_dir: Path | None = None
+    algeria_reference_dir: Path | None = None
+    queens_drones_reference_dir: Path | None = None
     apis_workflow_dir: Path | None = None
     analysis_artifact_dir: Path = DEFAULT_DATA_DIR / "analysis-artifacts"
+    analysis_artifact_backend: str = DEFAULT_ANALYSIS_ARTIFACT_BACKEND
+    analysis_artifact_r2_prefix: str = "analysis-artifacts/"
 
     @property
     def original_image_dir(self) -> Path:
@@ -89,6 +100,15 @@ class Settings:
         storage_backend = storage_backend.strip().casefold()
         if storage_backend not in {"local", "r2"}:
             raise ValueError("WBR_STORAGE_BACKEND must be either 'local' or 'r2'")
+        analysis_artifact_backend = os.getenv(
+            "WBR_ANALYSIS_ARTIFACT_BACKEND",
+            DEFAULT_ANALYSIS_ARTIFACT_BACKEND,
+        )
+        analysis_artifact_backend = analysis_artifact_backend.strip().casefold()
+        if analysis_artifact_backend not in {"local", "r2"}:
+            raise ValueError(
+                "WBR_ANALYSIS_ARTIFACT_BACKEND must be either 'local' or 'r2'"
+            )
 
         return cls(
             database_url=_normalize_database_url(
@@ -118,6 +138,32 @@ class Settings:
             nawrocka_reference_dir=(
                 Path(value) if (value := os.getenv("WBR_NAWROCKA_REFERENCE_DIR")) else None
             ),
+            kaur_india_reference_dir=(
+                Path(value) if (value := os.getenv("WBR_KAUR_INDIA_REFERENCE_DIR")) else None
+            ),
+            southwest_asia_reference_dir=(
+                Path(value) if (value := os.getenv("WBR_SOUTHWEST_ASIA_REFERENCE_DIR")) else None
+            ),
+            kazakhstan_reference_dir=(
+                Path(value) if (value := os.getenv("WBR_KAZAKHSTAN_REFERENCE_DIR")) else None
+            ),
+            serbia_reference_dir=(
+                Path(value) if (value := os.getenv("WBR_SERBIA_REFERENCE_DIR")) else None
+            ),
+            mexico_reference_dir=(
+                Path(value) if (value := os.getenv("WBR_MEXICO_REFERENCE_DIR")) else None
+            ),
+            northwestern_europe_reference_dir=(
+                Path(value)
+                if (value := os.getenv("WBR_NORTHWESTERN_EUROPE_REFERENCE_DIR"))
+                else None
+            ),
+            algeria_reference_dir=(
+                Path(value) if (value := os.getenv("WBR_ALGERIA_REFERENCE_DIR")) else None
+            ),
+            queens_drones_reference_dir=(
+                Path(value) if (value := os.getenv("WBR_QUEENS_DRONES_REFERENCE_DIR")) else None
+            ),
             apis_workflow_dir=(
                 Path(value) if (value := os.getenv("WBR_APIS_WORKFLOW_DIR")) else None
             ),
@@ -126,6 +172,11 @@ class Settings:
                     "WBR_ANALYSIS_ARTIFACT_DIR",
                     str(DEFAULT_DATA_DIR / "analysis-artifacts"),
                 )
+            ),
+            analysis_artifact_backend=analysis_artifact_backend,
+            analysis_artifact_r2_prefix=os.getenv(
+                "WBR_ANALYSIS_ARTIFACT_R2_PREFIX",
+                "analysis-artifacts/",
             ),
         )
 

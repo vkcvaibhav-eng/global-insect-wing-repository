@@ -24,8 +24,11 @@ python -m wing_repository.reference_data validate-import
 python -m wing_repository.reference_data build-analysis-models --model-version 1
 ```
 
-The build saves a versioned artifact under `WBR_ANALYSIS_ARTIFACT_DIR`.
-Artifacts are never overwritten.
+The build saves a versioned artifact under `WBR_ANALYSIS_ARTIFACT_DIR` when
+`WBR_ANALYSIS_ARTIFACT_BACKEND = "local"`. Hosted deployments can instead use
+`WBR_ANALYSIS_ARTIFACT_BACKEND = "r2"` and store the same artifact under the R2
+prefix configured by `WBR_ANALYSIS_ARTIFACT_R2_PREFIX`. Artifacts are never
+overwritten.
 
 ## Activation command
 

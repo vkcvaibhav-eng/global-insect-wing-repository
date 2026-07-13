@@ -16,9 +16,16 @@ from wing_repository.models import (
     WingAnalysisRun,
 )
 from wing_repository.analysis_services import (
+    ALGERIA_CITATION,
+    KAUR_INDIA_CITATION,
+    KAZAKHSTAN_CITATION,
+    MEXICO_CITATION,
     NAWROCKA_CITATION,
+    NORTHWESTERN_EUROPE_CITATION,
     OLEKSA_CITATION,
+    SERBIA_CITATION,
     SINGLE_WING_WARNING,
+    SOUTHWEST_ASIA_CITATION,
     WORKFLOW_CITATION,
     active_query_annotations,
     published_shape_match_rows,
@@ -30,7 +37,7 @@ ANALYSIS_NOT_AUTOMATICALLY_ACTIVE_MESSAGE = (
     "The code is updated, but the analysis is not yet automatically active."
 )
 ANALYSIS_ACTIVATION_REQUIREMENTS = (
-    "download the Oleksa, Nawrocka and WorkflowHub reference files",
+    "download the Oleksa, Kaur India, Southwest Asia, Kazakhstan, Serbia, Mexico, Northwestern Europe, Algeria and Nawrocka coordinate files plus the WorkflowHub RO-Crate",
     "run the database migration",
     "import the coordinates",
     "validate the imported data",
@@ -61,7 +68,18 @@ def _render_scope() -> None:
                 ("Taxon", "Apis mellifera"),
                 ("Wing analysed", "Right forewing"),
                 ("Landmarks", "19 fixed landmarks"),
-                ("Reference", "Oleksa et al. (2023), Zenodo 7244070"),
+                (
+                    "Geographical and nearest-shape reference",
+                    "Oleksa et al. (2023), Zenodo 7244070; Kaur et al. (2023), Zenodo 8071014; Machlowska et al. (2025), Zenodo 17075125; Temirbayeva et al. (2023), Zenodo 8128010; Kaur et al. (2023), Zenodo 10389960; Payro de la Cruz et al. (2024), Zenodo 13884732; Machlowska et al. (2026), Zenodo 18845767; Yamina and Tofilski (2026), Zenodo 18360081",
+                ),
+                (
+                    "Lineage-affinity reference",
+                    "Nawrocka et al. (2018), Zenodo 7567336",
+                ),
+                (
+                    "Workflow provenance",
+                    "WorkflowHub 422, DOI 10.48546/workflowhub.workflow.422.1",
+                ),
                 ("Analysis", "Shape only; physical size excluded"),
                 ("Input mode", "Single wing — preliminary result"),
             ],
@@ -196,6 +214,13 @@ def _render_result(run: WingAnalysisRun) -> None:
         "\n".join(
             [
                 OLEKSA_CITATION,
+                KAUR_INDIA_CITATION,
+                SOUTHWEST_ASIA_CITATION,
+                KAZAKHSTAN_CITATION,
+                SERBIA_CITATION,
+                MEXICO_CITATION,
+                NORTHWESTERN_EUROPE_CITATION,
+                ALGERIA_CITATION,
                 NAWROCKA_CITATION,
                 WORKFLOW_CITATION,
             ]

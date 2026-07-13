@@ -246,8 +246,16 @@ created with their own email addresses and administrator approval.
 
 External research datasets are also outside source control. Production
 reference-data paths are configured with `WBR_OLEKSA_REFERENCE_DIR`,
-`WBR_NAWROCKA_REFERENCE_DIR`, `WBR_APIS_WORKFLOW_DIR`, and
-`WBR_ANALYSIS_ARTIFACT_DIR`.
+`WBR_NAWROCKA_REFERENCE_DIR`, `WBR_KAUR_INDIA_REFERENCE_DIR`,
+`WBR_SOUTHWEST_ASIA_REFERENCE_DIR`, `WBR_KAZAKHSTAN_REFERENCE_DIR`,
+`WBR_SERBIA_REFERENCE_DIR`, `WBR_MEXICO_REFERENCE_DIR`,
+`WBR_NORTHWESTERN_EUROPE_REFERENCE_DIR`, `WBR_ALGERIA_REFERENCE_DIR`,
+`WBR_QUEENS_DRONES_REFERENCE_DIR`, `WBR_APIS_WORKFLOW_DIR`, and
+`WBR_ANALYSIS_ARTIFACT_DIR`. Hosted deployments can load activated model
+artifacts from Cloudflare R2 by setting
+`WBR_ANALYSIS_ARTIFACT_BACKEND = "r2"` and an artifact prefix such as
+`WBR_ANALYSIS_ARTIFACT_R2_PREFIX = "analysis-artifacts/"`; the database stores
+the stable artifact key while the object store supplies the bytes.
 
 ## Future-safe constraints
 
